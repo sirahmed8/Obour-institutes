@@ -6,13 +6,29 @@ import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { useRef } from 'react';
+import { useClickOutside } from '../../hooks/useClickOutside';
+
 export const Navbar: React.FC = () => {
   const location = useLocation();
   const { currentUser, isAdmin, login, logout } = useAuth();
   const { theme, setTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Use new hook for cleaner code
+  useClickOutside(dropdownRef, () => setIsDropdownOpen(false));
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  // "Feature": Persist Email Subscription 
+  const [emailSubscribed, setEmailSubscribed] = useState(() => localStorage.getItem('email_sub') === 'true');
+  const toggleEmailSub = () => {
+      const newState = !emailSubscribed;
+      setEmailSubscribed(newState);
+      localStorage.setItem('email_sub', String(newState));
+  };
 
   const isActive = (path: string) => {
     return location.pathname === path 
