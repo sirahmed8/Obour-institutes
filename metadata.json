@@ -1,0 +1,8 @@
+{
+  "name": "Obour institutes",
+  "description": "Premium College Resource Sharing Platform with AI-powered study assistance.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

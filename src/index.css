@@ -1,0 +1,67 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  @apply bg-gray-50 dark:bg-gray-900 transition-colors duration-300;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none; /* Prevent pull-to-refresh on mobile apps */
+}
+
+/* --- THE "WHITE FLASH" FIX --- */
+*:focus-visible {
+  outline: none !important;
+}
+
+.focus-ring {
+  @apply ring-2 ring-indigo-500/50 ring-offset-2 dark:ring-offset-gray-900 transition-all duration-300;
+}
+
+*:focus {
+  outline: none !important;
+}
+
+@layer base {
+  html {
+    font-size: 16px; /* Base size legibility */
+  }
+
+  button, a {
+    @apply cursor-pointer select-none active:scale-95 transition-transform;
+    min-width: 44px;
+    min-height: 44px; /* Accessible touch targets */
+  }
+  
+  svg {
+    @apply shrink-0;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    @apply ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-gray-900 transition-shadow outline-none;
+  }
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 dark:bg-gray-600 rounded-full;
+}
+
+/* Safe area padding for iPhones without home button */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 20px);
+}
+
+.prose {
+  max-width: none !important;
+}
+
+.page-container {
+  @apply min-h-screen w-full;
+}

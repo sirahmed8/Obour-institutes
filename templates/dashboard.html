@@ -1,0 +1,120 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Sidebar: Add Forms -->
+    <div class="col-lg-4">
+        <div class="card mb-4 bg-primary text-white">
+            <div class="card-body p-4">
+                <h5 class="card-title mb-3 fw-bold">1. New Subject</h5>
+                <form action="{{ url_for('add_subject') }}" method="POST">
+                    <input type="text" name="name" class="form-control mb-3 border-0" placeholder="e.g. Data Structures" required>
+                    <button class="btn btn-light text-primary w-100 fw-bold">Create Subject</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3">
+                <h5 class="card-title mb-0 fw-bold text-dark">2. Add Resource</h5>
+            </div>
+            <div class="card-body p-4">
+                <form action="{{ url_for('add_resource') }}" method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">TARGET SUBJECT</label>
+                        <select name="subject_id" class="form-select bg-light border-0" required>
+                            <option value="" selected disabled>Select Subject...</option>
+                            {% for sub in subjects %}
+                                <option value="{{ sub.id }}">{{ sub.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">TITLE</label>
+                        <input type="text" name="title" class="form-control bg-light border-0" placeholder="e.g. Week 1 Lecture" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">TYPE</label>
+                        <select name="type" class="form-select bg-light border-0" id="typeSelector" onchange="toggleInput()">
+                            <option value="file">File Upload (PDF/Img)</option>
+                            <option value="link">External Link</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-4" id="fileInput">
+                        <label class="form-label small fw-bold text-muted">FILE</label>
+                        <input type="file" name="file_upload" class="form-control">
+                    </div>
+                    
+                    <div class="mb-4 d-none" id="linkInput">
+                        <label class="form-label small fw-bold text-muted">URL</label>
+                        <input type="url" name="url_link" class="form-control bg-light border-0" placeholder="https://">
+                    </div>
+
+                    <button class="btn btn-success w-100 py-2">Publish Resource</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content: List -->
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header bg-white py-3">
+                <h5 class="card-title mb-0 fw-bold">Library Content</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">Resource</th>
+                                <th>Subject</th>
+                                <th>Date</th>
+                                <th class="text-end pe-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for subject in subjects %}
+                                {% for res in subject.resources %}
+                                <tr>
+                                    <td class="ps-4">
+                                        <div class="fw-bold">{{ res.title }}</div>
+                                        <span class="badge {% if res.type == 'file' %}bg-secondary{% else %}bg-info text-dark{% endif %} rounded-pill" style="font-size: 0.65rem;">{{ res.type|upper }}</span>
+                                    </td>
+                                    <td class="text-muted small">{{ subject.name }}</td>
+                                    <td class="text-muted small">{{ res.date_posted.strftime('%m-%d') }}</td>
+                                    <td class="text-end pe-4">
+                                        <a href="{{ url_for('delete_resource', id=res.id) }}" class="btn btn-sm btn-outline-danger py-1 px-3" onclick="return confirm('Permanently delete this resource?')">Delete</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% if not subjects %}
+                        <div class="p-5 text-center text-muted">No content found. Start by creating a subject.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleInput() {
+        const type = document.getElementById('typeSelector').value;
+        const fileInput = document.getElementById('fileInput');
+        const linkInput = document.getElementById('linkInput');
+
+        if (type === 'file') {
+            fileInput.classList.remove('d-none');
+            linkInput.classList.add('d-none');
+        } else {
+            fileInput.classList.add('d-none');
+            linkInput.classList.remove('d-none');
+        }
+    }
+</script>
+{% endblock %}

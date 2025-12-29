@@ -1,0 +1,62 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+<div class="text-center mb-5">
+    <h1 class="display-6 fw-bold text-dark">Academic Resources</h1>
+    <p class="text-muted">Access lecture notes, assignments, and external references.</p>
+</div>
+
+{% if subjects %}
+    <div class="accordion" id="subjectsAccordion">
+        {% for subject in subjects %}
+        <div class="accordion-item mb-3 border-0 overflow-hidden rounded-3 shadow-sm">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed fw-bold py-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ subject.id }}">
+                    {{ subject.name }}
+                </button>
+            </h2>
+            <div id="collapse{{ subject.id }}" class="accordion-collapse collapse" data-bs-parent="#subjectsAccordion">
+                <div class="accordion-body bg-light p-4">
+                    {% if subject.resources %}
+                        <div class="list-group list-group-flush rounded-3">
+                            {% for resource in subject.resources %}
+                                <div class="list-group-item d-flex justify-content-between align-items-center py-3 bg-white mb-2 border rounded-3 shadow-sm">
+                                    <div class="d-flex align-items-center gap-3">
+                                        {% if resource.type == 'file' %}
+                                            <div class="bg-danger bg-opacity-10 text-danger p-2 rounded">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-file-earmark-text" viewBox="0 0 16 16"><path d="M5.5 7a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5zM5 9.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5z"/><path d="M9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.5L9.5 0zm0 1v2A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z"/></svg>
+                                            </div>
+                                        {% else %}
+                                            <div class="bg-primary bg-opacity-10 text-primary p-2 rounded">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-link-45deg" viewBox="0 0 16 16"><path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1.002 1.002 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4.018 4.018 0 0 1-.128-1.287z"/><path d="M6.586 4.626A3 3 0 0 1 7.414 2l.586.586a1.002 1.002 0 0 1 2.7 0 1.002 1.002 0 0 1 3.585 0 3 3 0 0 1 4.243 4.243l-.586.586a1.002 1.002 0 0 1 1.768 0 1.002 1.002 0 0 1-1.414 1.414l-.586-.586a3 3 0 0 0-4.243-4.243L6.586 4.626z"/></svg>
+                                            </div>
+                                        {% endif %}
+                                        <div>
+                                            <h6 class="mb-0 fw-bold">{{ resource.title }}</h6>
+                                            <small class="text-muted">{{ resource.date_posted.strftime('%b %d, %Y') }}</small>
+                                        </div>
+                                    </div>
+                                    <a href="{% if resource.type == 'file' %}{{ url_for('uploaded_file', filename=resource.content) }}{% else %}{{ resource.content }}{% endif %}" target="_blank" class="btn btn-sm btn-dark px-3">Open</a>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-3 text-muted">
+                            <small>No resources uploaded for this subject yet.</small>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="text-center py-5">
+        <div class="bg-white p-5 rounded-circle d-inline-block shadow-sm mb-3">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" class="bi bi-inbox text-muted" viewBox="0 0 16 16"><path d="M4.98 4a.5.5 0 0 0-.39.188L1.54 8H6a.5.5 0 0 1 .5.5 1.5 1.5 0 1 0 3 0A.5.5 0 0 1 10 8h4.46l-3.05-3.812A.5.5 0 0 0 11.02 4H4.98zm-1.17-.437A1.5 1.5 0 0 1 4.98 3h6.04a1.5 1.5 0 0 1 1.17.563l3.7 4.625a.5.5 0 0 1 .106.374l-.39 3.124A1.5 1.5 0 0 1 14.117 16H1.883a1.5 1.5 0 0 1-1.489-1.314l-.39-3.124a.5.5 0 0 1 .106-.374l3.7-4.625zM2.002 9a2 2 0 0 0-1.998 1.998l.4 3.2a.5.5 0 0 0 .495.422h12.198a.5.5 0 0 0 .495-.422l.4-3.2A2 2 0 0 0 14 9H2.002zm1.61-3L2.33 8h1.275a.5.5 0 0 1 0-1H3.612zm10.058 0-.875 2H11.5a.5.5 0 0 1 0-1h1.17z"/></svg>
+        </div>
+        <p class="text-muted">No content available at the moment.</p>
+    </div>
+{% endif %}
+{% endblock %}
