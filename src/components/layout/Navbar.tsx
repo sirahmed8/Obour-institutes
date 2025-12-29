@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import { useRef } from 'react';
 import { useClickOutside } from '../../hooks/useClickOutside';
+import { Switch } from '../ui/Switch';
 
 export const Navbar: React.FC = () => {
   const location = useLocation();
