@@ -53,9 +53,11 @@ export const AIChatbot: React.FC = () => {
     if (!textToSend.trim()) return;
 
     // 1. Instantly show user message
-    setMessages((prev) => [...prev, { role: 'user', text: textToSend }]);
-    setLastMessage(textToSend); // Save for retry
-    setInput('');
+    if (!retryText) {
+       setMessages((prev) => [...prev, { role: 'user', text: textToSend }]);
+       setLastMessage(textToSend); // Save for retry
+       setInput('');
+    }
     setLoading(true);
 
     try {
@@ -69,20 +71,28 @@ export const AIChatbot: React.FC = () => {
         Answer concisely and helpfully.
       `;
       
-      // 4. Generate
+      // 4. Generate with CORRECT Payload Structure
       const response = await ai.models.generateContent({
-        model: 'gemini-1.5-flash', // or 'gemini-pro'
-        contents: [{ role: 'user', parts: [{ text: systemPrompt + "\n\nUser: " + textToSend }] }] 
+        model: 'gemini-1.5-flash',
+        contents: [
+            { 
+                role: 'user', 
+                parts: [{ text: systemPrompt + "\n\nUser: " + textToSend }] 
+            }
+        ] 
       });
 
-      const text = response.text || "I'm processing that...";
+      // Handle response.text() safely (SDK version variance)
+      // Cast to any to bypass TS error: "expression is not callable because it is a 'get' accessor"
+      const responseAny = response as any;
+      const text = typeof responseAny.text === 'function' ? responseAny.text() : (responseAny.text || "I'm thinking...");
       
-      setMessages((prev) => [...prev, { role: 'model', text }]);
+      setMessages((prev) => [...prev, { role: 'model', text: typeof text === 'string' ? text : "Received non-text response." }]);
     } catch (error) {
       console.error("Gemini Error:", error);
       setMessages((prev) => [
         ...prev,
-        { role: 'model', text: `**System Error**: I'm unable to connect right now. Please check your internet connection.` }
+        { role: 'model', text: `**System Error**: Comparison mismatch or Network fail. details: ${error}` }
       ]);
     } finally {
       setLoading(false);
@@ -90,8 +100,12 @@ export const AIChatbot: React.FC = () => {
   };
 
   const handleRetry = () => {
+     // Remove last system error message
      setMessages(prev => prev.filter(m => !m.text.includes('System Error')));
-     handleSend(lastMessage);
+     // Retry last message
+     if (lastMessage) { 
+         handleSend(lastMessage);
+     }
   };
 
   return (

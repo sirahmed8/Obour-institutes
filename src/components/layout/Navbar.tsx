@@ -165,7 +165,7 @@ export const Navbar: React.FC = () => {
                                    <div className={`p-2 rounded-full ${emailSubscribed ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
                                        <Mail size={16} />
                                    </div>
-                                   Email Updates
+                                   {t('email_updates')}
                                </div>
                                <Switch 
                                     checked={emailSubscribed} 
@@ -180,7 +180,7 @@ export const Navbar: React.FC = () => {
                                     <div className={`p-2 rounded-full ${Notification.permission === 'granted' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
                                         {Notification.permission === 'granted' ? <BellRing size={16} /> : <BellOff size={16} />}
                                     </div>
-                                    Notifications
+                                    {t('notifications')}
                                </div>
                                <Switch 
                                     checked={Notification.permission === 'granted'} 
@@ -201,12 +201,24 @@ export const Navbar: React.FC = () => {
                                   <Globe className="h-4 w-4 mr-2" />
                                   {t('language')}
                               </div>
-                              <button
-                                  onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')}
-                                  className="text-xs font-bold px-2 py-1 rounded bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 transition-colors duration-300 focus-ring"
-                              >
-                                  {language === 'en' ? 'English' : 'العربية'}
-                              </button>
+                              <div className="flex bg-gray-100 dark:bg-gray-900 rounded-lg p-1 relative">
+                                  {(['en', 'ar'] as const).map((lang) => (
+                                      <button
+                                          key={lang}
+                                          onClick={() => setLanguage(lang)}
+                                          className={`relative z-10 px-3 py-1.5 text-xs font-bold rounded-md transition-colors duration-200 ${language === lang ? 'text-indigo-600 dark:text-indigo-300' : 'text-gray-400 hover:text-gray-600'}`}
+                                      >
+                                          {language === lang && (
+                                              <motion.div
+                                                  layoutId="desktop-lang-pill"
+                                                  className="absolute inset-0 bg-white dark:bg-gray-700 rounded-md shadow-sm"
+                                                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                              />
+                                          )}
+                                          <span className="relative z-10">{lang.toUpperCase()}</span>
+                                      </button>
+                                  ))}
+                              </div>
                           </div>
                           <div className="h-px bg-gray-100 dark:bg-gray-700 my-1" />
                           <button 

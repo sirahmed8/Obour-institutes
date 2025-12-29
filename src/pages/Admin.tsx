@@ -74,6 +74,7 @@ export const Admin: React.FC = () => {
         setAnalyticsLogs(anaLogs || []);
         setSettings(sysSettings);
         setAdmins(adminList || []);
+        toast.success("Dashboard Updated");
     } catch(e) { 
         console.error("Admin Critical Data Load Error:", e);
         toast.error("Some data failed to load. Check console.");
@@ -114,7 +115,7 @@ export const Admin: React.FC = () => {
         <div>
           <h1 className="text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight">Admin Hub</h1>
           <p className="text-gray-500 mt-2 flex items-center gap-2 font-medium">
-            Role: <span className="font-mono bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1 rounded-lg text-indigo-600 dark:text-indigo-400 font-bold text-sm border border-indigo-100 dark:border-indigo-800">
+            Role: <span className="font-mono bg-indigo-600 text-white px-3 py-1 rounded-lg font-bold text-sm shadow-md shadow-indigo-500/30">
                 {role === 'super_admin' ? 'OWNER' : role?.replace('_', ' ').toUpperCase()}
             </span>
           </p>
@@ -204,9 +205,9 @@ export const Admin: React.FC = () => {
                                   onChange={e => setNewAdminRole(e.target.value as UserRole)}
                                   className="p-3 rounded-xl border border-gray-200 dark:bg-gray-800 dark:border-gray-600 dark:text-white bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
                                 >
-                                    <option value="viewer">Viewer</option>
-                                    <option value="editor">Editor</option>
-                                    <option value="super_admin">Owner</option>
+                                    <option value="viewer" className="dark:bg-gray-800">Viewer</option>
+                                    <option value="editor" className="dark:bg-gray-800">Editor</option>
+                                    <option value="super_admin" className="dark:bg-gray-800">Owner</option>
                                 </select>
                                 <button className="bg-indigo-600 text-white px-6 py-3 rounded-xl hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-500/30 transition-all active:scale-95 flex items-center justify-center">
                                     <UserPlus size={20} />

@@ -4,14 +4,13 @@ import { motion } from 'framer-motion';
 interface SwitchProps {
   checked: boolean;
   onChange: () => void;
-  color?: 'indigo' | 'emerald' | 'blue' | 'purple';
+  color?: 'indigo' | 'emerald' | 'purple'; // Restricted to premium colors
 }
 
 export const Switch: React.FC<SwitchProps> = ({ checked, onChange, color = 'indigo' }) => {
   const colorClasses = {
     indigo: 'bg-indigo-600',
-    emerald: 'bg-emerald-500',
-    blue: 'bg-blue-600',
+    emerald: 'bg-emerald-500', 
     purple: 'bg-purple-600',
   };
 
@@ -19,19 +18,19 @@ export const Switch: React.FC<SwitchProps> = ({ checked, onChange, color = 'indi
     <button
       onClick={onChange}
       className={`
-        relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none border-2 border-transparent
-        ${checked ? colorClasses[color] : 'bg-gray-200 dark:bg-gray-700'}
+        relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none 
+        ${checked ? colorClasses[color] : 'bg-slate-600'}
       `}
     >
       <span className="sr-only">Toggle setting</span>
       <motion.span
         layout
-        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+        transition={{ type: "spring", stiffness: 700, damping: 30 }}
         className={`
-          inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0
+          inline-block h-5 w-5 transform rounded-full bg-white shadow-md
         `}
         animate={{
-            x: checked ? 20 : 0
+            x: checked ? 20 : 2 // Slight offset for inner padding look
         }}
       />
     </button>
