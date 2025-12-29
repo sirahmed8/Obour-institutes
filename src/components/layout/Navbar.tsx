@@ -160,40 +160,39 @@ export const Navbar: React.FC = () => {
 
                           {/* Email Subscription Toggle */}
                           <div className="px-3 py-2 flex items-center justify-between rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200">
-                               <div className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200">
-                                   <Mail className={`h-4 w-4 mr-2 ${emailSubscribed ? 'text-indigo-500' : 'text-gray-400'}`} />
+                               <div className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200 gap-2">
+                                   <div className={`p-2 rounded-full ${emailSubscribed ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
+                                       <Mail size={16} />
+                                   </div>
                                    Email Updates
                                </div>
-                               <button
-                                  onClick={toggleEmailSub}
-                                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${emailSubscribed ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'}`}
-                               >
-                                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${emailSubscribed ? 'translate-x-6' : 'translate-x-1'}`} />
-                               </button>
+                               <Switch 
+                                    checked={emailSubscribed} 
+                                    onChange={toggleEmailSub} 
+                                    color="indigo"
+                               />
                           </div>
 
                           {/* Notifications Toggle */}
                           <div className="px-3 py-2 flex items-center justify-between rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200">
-                              <div className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200">
-                                   {Notification.permission === 'granted' ? <BellRing className="h-4 w-4 mr-2 text-emerald-500" /> : <BellOff className="h-4 w-4 mr-2 text-gray-400" />}
-                                   Notifications
-                              </div>
-                              <button
-                                  onClick={async () => {
-                                      if (Notification.permission === 'granted') {
-                                           // We can't revoke, but we can perhaps simulate toggling off in app state? 
-                                           // For now, let's just show a toast explaining they must block in browser.
-                                           // OR if user meant the "Future" feature, I will toggle a local state only.
-                                            alert("To disable notifications completely, please adjust your browser settings.");
-                                      } else {
-                                          const permission = await Notification.requestPermission();
-                                          if(permission === 'granted') window.location.reload(); // Refresh to sync
-                                      }
-                                  }}
-                                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${Notification.permission === 'granted' ? 'bg-emerald-500' : 'bg-gray-200 dark:bg-gray-700'}`}
-                              >
-                                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${Notification.permission === 'granted' ? 'translate-x-6' : 'translate-x-1'}`} />
-                              </button>
+                               <div className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200 gap-2">
+                                    <div className={`p-2 rounded-full ${Notification.permission === 'granted' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
+                                        {Notification.permission === 'granted' ? <BellRing size={16} /> : <BellOff size={16} />}
+                                    </div>
+                                    Notifications
+                               </div>
+                               <Switch 
+                                    checked={Notification.permission === 'granted'} 
+                                    onChange={async () => {
+                                       if (Notification.permission === 'granted') {
+                                             alert("To disable notifications completely, please adjust your browser settings.");
+                                       } else {
+                                           const permission = await Notification.requestPermission();
+                                           if(permission === 'granted') window.location.reload(); 
+                                       }
+                                   }}
+                                   color="emerald"
+                               />
                           </div>
 
                           <div className="px-3 py-2 flex items-center justify-between rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200">
