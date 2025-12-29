@@ -118,6 +118,7 @@ export const Navbar: React.FC = () => {
                 <AnimatePresence>
                   {isDropdownOpen && (
                     <motion.div
+                      ref={dropdownRef}
                       initial={{ opacity: 0, y: 10, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -155,6 +156,20 @@ export const Navbar: React.FC = () => {
                                       </button>
                                   ))}
                               </div>
+                          </div>
+
+                          {/* Email Subscription Toggle */}
+                          <div className="px-3 py-2 flex items-center justify-between rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200">
+                               <div className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200">
+                                   <Mail className={`h-4 w-4 mr-2 ${emailSubscribed ? 'text-indigo-500' : 'text-gray-400'}`} />
+                                   Email Updates
+                               </div>
+                               <button
+                                  onClick={toggleEmailSub}
+                                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${emailSubscribed ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'}`}
+                               >
+                                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${emailSubscribed ? 'translate-x-6' : 'translate-x-1'}`} />
+                               </button>
                           </div>
 
                           {/* Notifications Toggle */}
