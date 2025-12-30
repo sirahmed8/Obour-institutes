@@ -1,10 +1,9 @@
-```
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Library, Search, BookOpen, GraduationCap, Sparkles, ChevronDown, User, ArrowDownUp, Clock, Check } from 'lucide-react';
 import { DBService } from '../services/storage';
 import { useAuth } from '../context/AuthContext';
-import { Subject, ICON_MAP, SortOption } from '../types';
+import { Subject, ICON_MAP } from '../types';
 import { useLanguage } from '../context/LanguageContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Banner } from '../components/features/Banner';
