@@ -62,7 +62,7 @@ export const Navbar: React.FC = () => {
             >
                 <Menu size={24} />
             </button>
-            <Link to="/" className="flex items-center gap-3 group">
+            <Link to="/main" className="flex items-center gap-3 group">
               <img 
                 src="/obour-logo.png" 
                 alt="Obour" 
@@ -79,8 +79,8 @@ export const Navbar: React.FC = () => {
             {currentUser && (
                <div className="flex gap-2">
                   <Link 
-                    to="/" 
-                    className={`flex items-center px-4 py-2 rounded-full text-sm transition-all duration-300 ${isActive('/')}`}
+                    to="/main" 
+                    className={`flex items-center px-4 py-2 rounded-full text-sm transition-all duration-300 ${isActive('/main')}`}
                   >
                     <LayoutGrid className="h-4 w-4 mr-2" />
                     {t('student_view')}
@@ -302,7 +302,7 @@ export const Navbar: React.FC = () => {
                         <button onClick={toggleMobileMenu} className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-all duration-200"><X size={20}/></button>
                     </div>
                     <div className="p-6 space-y-3 flex-1 overflow-y-auto text-left">
-                        <Link to="/" onClick={toggleMobileMenu} className="flex items-center p-4 rounded-2xl hover:bg-indigo-50 dark:hover:bg-white/5 text-gray-700 dark:text-gray-200 font-bold transition-all duration-200 group">
+                        <Link to="/main" onClick={toggleMobileMenu} className="flex items-center p-4 rounded-2xl hover:bg-indigo-50 dark:hover:bg-white/5 text-gray-700 dark:text-gray-200 font-bold transition-all duration-200 group">
                             <div className="p-2.5 bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400 rounded-xl mr-4 group-hover:scale-110 transition-transform">
                                 <LayoutGrid size={20}/>
                             </div>

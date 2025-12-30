@@ -110,7 +110,8 @@ const AppContent: React.FC = () => {
         <ToastSetup /> 
         <Suspense fallback={<LoadingScreen />}>
           <Routes>
-            <Route path="/" element={<Home />} />
+            <Route path="/" element={<Navigate to="/main" replace />} />
+            <Route path="/main" element={<Home />} />
             <Route path="/subject/:id" element={<SubjectView />} />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/team" element={<Team />} />
