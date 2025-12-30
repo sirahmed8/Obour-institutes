@@ -1,5 +1,3 @@
-
-import React, { useEffect, useState, lazy, Suspense } from 'react';
 import React, { useEffect, useState, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
