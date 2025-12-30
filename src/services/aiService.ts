@@ -51,77 +51,43 @@ export const generateAIResponse = async (message: string, context: string, model
   try {
     switch (modelProvider) {
       case 'gemini':
+      case 'openrouter':
+      case 'deepseek':
+      case 'kimi':
+        // UNIVERSAL FALLBACK CHAIN LOGIC
+        // Priority 1: Gemini 2.5/2.0 Flash (Primary)
         try {
-            // Priority 1: Gemini Direct
             const model = genAI.getGenerativeModel({ model: MODEL_GEMINI });
             const result = await model.generateContent(fullPrompt);
             return result.response.text();
         } catch (geminiError: any) {
              console.warn("Gemini Primary Failed:", geminiError);
              
-             // Priority 2: Try Gemini Fallback (1.5)
+             // Priority 2: OpenRouter (GPT-OSS)
              try {
-                const modelFallback = genAI.getGenerativeModel({ model: MODEL_GEMINI_FALLBACK });
-                const result = await modelFallback.generateContent(fullPrompt);
-                return result.response.text();
-             } catch (geminiFallbackError) {
-                 console.warn("Gemini Fallback Failed. Switching to OpenRouter...", geminiFallbackError);
-                 
-                 // Priority 3: Auto-switch to OpenRouter (GPT-OSS)
+                 const orResponse = await openRouter.chat.completions.create({
+                    model: MODEL_OPENROUTER_PRIMARY,
+                    messages: [{ role: "user", content: fullPrompt }],
+                  });
+                  return orResponse.choices[0].message.content || "No response.";
+             } catch (orError) {
+                 console.warn("OpenRouter Failed. Switching to DeepSeek...", orError);
+
+                 // Priority 3: DeepSeek
                  try {
-                     const orResponse = await openRouter.chat.completions.create({
-                        model: MODEL_OPENROUTER_PRIMARY,
-                        messages: [{ role: "user", content: fullPrompt }],
-                      });
-                      return orResponse.choices[0].message.content || "No response.";
-                 } catch (orError) {
-                     // If everything fails, throw Quota error to trigger Offline Mode
+                    const dsResponse = await deepSeek.chat.completions.create({
+                      model: "deepseek-chat",
+                      messages: [{ role: "user", content: fullPrompt }],
+                    });
+                    return dsResponse.choices[0].message.content || "No response.";
+                 } catch (dsError) {
+                     // Priority 4: Offline Mode (Throw Quota Error to trigger UI fallback)
+                     console.warn("DeepSeek Failed. Triggering Offline Mode.", dsError);
                      throwQuotaError();
                  }
              }
         }
         break;
-
-      case 'openrouter':
-        try {
-          const orResponse = await openRouter.chat.completions.create({
-            model: MODEL_OPENROUTER_PRIMARY,
-            messages: [{ role: "user", content: fullPrompt }],
-          });
-          return orResponse.choices[0].message.content || "No response.";
-        } catch (e) {
-          console.warn("OpenRouter Primary Failed, switching to fallback...", e);
-          try {
-              const fallback = await openRouter.chat.completions.create({
-                model: MODEL_OPENROUTER_FALLBACK, 
-                messages: [{ role: "user", content: fullPrompt }],
-              });
-              return fallback.choices[0].message.content || "No response (Fallback).";
-          } catch (finalError) {
-              throwQuotaError();
-          }
-        }
-        break;
-
-      case 'deepseek':
-        try {
-            const dsResponse = await deepSeek.chat.completions.create({
-              model: "deepseek-chat",
-              messages: [{ role: "user", content: fullPrompt }],
-            });
-            return dsResponse.choices[0].message.content || "No response.";
-        } catch(e) { throwQuotaError(); }
-        break;
-
-      case 'kimi':
-         try {
-            const kimiResponse = await moonshot.chat.completions.create({
-              model: "moonshot-v1-8k",
-              messages: [{ role: "user", content: fullPrompt }],
-            });
-            return kimiResponse.choices[0].message.content || "No response.";
-         } catch(e) { throwQuotaError(); }
-         break;
 
       default:
         throw new Error("Invalid Model");

@@ -30,6 +30,24 @@ body {
 }
 
 @layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+  }
+
+  /* Remove default blue/white outline on focus for all browsers */
+  *:focus {
+    outline: none !important;
+  }
+
+  /* Optional: Standardize focus ring if desired, but User specifically asked to remove 'White Flash' */
+  input:focus,
+  textarea:focus,
+  select:focus {
+    outline: none !important;
+    box-shadow: none !important; /* Or strictly control it */
+  }
+
   html {
     font-size: 16px; /* Base size legibility */
   }

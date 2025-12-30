@@ -1,29 +1,30 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
-import { Bot, Send, X, Wifi, WifiOff, Paperclip, Shield, Sparkles, ChevronDown, Cpu, Lock, Brain, Globe, MessageSquare, Trash2 } from 'lucide-react';
+import { Bot, Send, X, Wifi, WifiOff, Paperclip, Shield, Sparkles, ChevronDown, Lock, Check } from 'lucide-react';
 import { DBService } from '../../services/storage';
 import { getOfflineResponse } from '../../services/offlineChatbot';
 import Markdown from 'react-markdown';
 import { useAuth } from '../../context/AuthContext';
 import { generateAIResponse, AIModel } from '../../services/aiService';
 import { ConfirmationModal } from '../ui/ConfirmationModal';
-import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore'; 
-import { db } from '../../services/firebase';
 import { toast } from 'react-hot-toast';
+import { chatService } from '../../services/chatService';
+import { Message } from '../../types';
 
-interface Message {
-  role: 'user' | 'model';
-  text: string;
-}
+// Emoji Picker (Simulated)
+const EMOJIS = ['👍', '❤️', '😂', '😮', '😢'];
 
 export const AIChatbot: React.FC = () => {
   const { currentUser } = useAuth();
   
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
+  // Local messages for AI flow, but we overlay Admin messages from ChatService
+  const [localMessages, setLocalMessages] = useState<any[]>([
     { role: 'model', text: "أهلاً بك في مساعد معهد العبور الذكي 👋 \n\nيمكنني مساعدتك في العثور على الدورات، وتلخيص الملاحظات، أو الإجابة على أسئلة حول المعهد. \n\n*قم بالتبديل إلى 'Online Mode' للحصول على إجابات مدعومة بالذكاء الاصطناعي!*" }
   ]);
+  const [adminMessages, setAdminMessages] = useState<Message[]>([]);
+
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [fullContext, setFullContext] = useState<string>('');
@@ -39,95 +40,59 @@ export const AIChatbot: React.FC = () => {
   const constraintsRef = useRef(null);
   const dragControls = useDragControls();
 
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
-  useEffect(() => {
-    if (!window.visualViewport) return;
-    
-    const handleResize = () => {
-      const viewportHeight = window.visualViewport!.height;
-      const windowHeight = window.innerHeight;
-      const newKeyboardHeight = windowHeight - viewportHeight;
-      setKeyboardHeight(Math.max(0, newKeyboardHeight));
-    };
-    
-    window.visualViewport.addEventListener('resize', handleResize);
-    window.visualViewport.addEventListener('scroll', handleResize);
-    
-    return () => {
-      window.visualViewport!.removeEventListener('resize', handleResize);
-      window.visualViewport.removeEventListener('scroll', handleResize);
-    };
-  }, []);
+  // --- PERSISTENCE & INIT ---
 
   useEffect(() => {
     const savedMode = localStorage.getItem('chatbot_mode') as 'online' | 'offline' | 'admin' | null;
     const savedModel = localStorage.getItem('ai_model') as AIModel | null;
+    const clearedTimestamp = localStorage.getItem('chat_cleared_timestamp');
     
     if (savedMode) setChatbotMode(savedMode);
-    else setChatbotMode('offline');
-
     if (savedModel) setSelectedModel(savedModel);
 
     const savedMessages = localStorage.getItem('chat_history');
     if (savedMessages) {
         try {
-            setMessages(JSON.parse(savedMessages));
+            setLocalMessages(JSON.parse(savedMessages));
         } catch (e) { console.error("History load failed", e); }
     }
   }, []);
 
+  // Save AI history locally
   useEffect(() => {
-      if (!currentUser) return;
-      
-      // Listen for Admin Replies (Support Mode)
-      // Even if not in admin mode, we might want to see notifications or switch mode?
-      // For now, let's append them if they arrive.
-      const q = query(
-          collection(db, 'users', currentUser.uid, 'messages'),
-          orderBy('timestamp', 'asc'),
-          limit(50)
-      );
+    if (localMessages.length > 0) { 
+        localStorage.setItem('chat_history', JSON.stringify(localMessages));
+    }
+  }, [localMessages]);
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-          const newMsgs = snapshot.docs.map(d => d.data());
-          // Merge with local messages? 
-          // Actually, if we are using this logic, we should probably sync ALL messages with Firestore if in Admin Mode.
-          // But to avoid rewriting the entire local-storage logic which users like for offline privacy:
-          // We will just append NEW admin messages that we haven't seen.
-          // Or, simple Hack: If we receive a message from 'model' that isSupportReply, show it.
+
+  // --- ADMIN MODE SYNC ---
+  useEffect(() => {
+      if (!currentUser || chatbotMode !== 'admin') return;
+
+      const unsubscribe = chatService.subscribeToMessages(currentUser.uid, (msgs) => {
+          // Filter if history was cleared? 
+          // Implementation: The user only wants to see messages after "Clear History".
+          // However, Admin persistence requires the messages to stay in DB.
+          // Filter on client side based on 'chat_cleared_timestamp'
+          const clearedTime = localStorage.getItem('chat_cleared_timestamp');
+          let filtered = msgs;
+          if (clearedTime) {
+             filtered = msgs.filter(m => m.timestamp?.seconds * 1000 > parseInt(clearedTime));
+          }
+          setAdminMessages(filtered);
           
-          // Better: If in Admin Mode, show Firestore messages primarily?
-          // The user wants "Admin <-> User Chat Logic" fixed.
-          
-          snapshot.docChanges().forEach((change) => {
-              if (change.type === 'added') {
-                  const data = change.doc.data();
-                  // Avoid duplicating our own messages if we synced them (we currently don't sync user messages to this collection, only inbox)
-                  // The Admin writes to this collection.
-                  if (data.isSupportReply) {
-                      setMessages(prev => {
-                          // Dedup check
-                          if (prev.some(m => m.text === data.text)) return prev;
-                          return [...prev, { role: 'model', text: `📩 **Support Team:**\n\n${data.text}` }];
-                      });
-                      // If not in admin mode, maybe alert?
-                      if (chatbotMode !== 'admin') {
-                           toast("New Support Message Received", { icon: '💬' });
-                      }
-                  }
-              }
-          });
+          // Mark admin messages as seen by user
+          chatService.markAsSeen(currentUser.uid, 'user');
       });
+
       return () => unsubscribe();
   }, [currentUser, chatbotMode]);
 
-  useEffect(() => {
-    if (messages.length > 0) { 
-        localStorage.setItem('chat_history', JSON.stringify(messages));
-    }
-  }, [messages]);
+
+  // --- HANDLERS ---
 
   const changeMode = (mode: 'online' | 'offline' | 'admin') => {
     setChatbotMode(mode);
@@ -135,140 +100,96 @@ export const AIChatbot: React.FC = () => {
     setShowModelMenu(false);
 
     if (mode === 'admin') {
-        const lastMsg = messages[messages.length - 1];
-        if (!lastMsg || !lastMsg.text.includes('Support Mode Activated')) {
-             setMessages(prev => [...prev, { role: 'model', text: "Support Mode Activated 🛡️\n\nHow can we help? Your messages will be sent directly to the institute administration." }]);
-        }
+         // Maybe show a "Connected to Support" banner
     } else {
-         const modeName = mode === 'online' ? 'Online AI' : 'Offline AI';
-         setMessages(prev => [...prev, { role: 'model', text: `Switched to **${modeName}** mode.` }]);
+         // Switch back to AI messages
     }
-  };
-
-  const handleModelChange = (model: AIModel) => {
-      setSelectedModel(model);
-      localStorage.setItem('ai_model', model);
-      setShowModelMenu(false);
-      
-      let modelName = 'Gemini';
-      if (model === 'openrouter') modelName = 'GPT-OSS (Free)';
-      if (model === 'deepseek') modelName = 'DeepSeek V3';
-      if (model === 'kimi') modelName = 'Kimi AI';
-
-      setMessages(prev => [...prev, { role: 'model', text: `AI Model switched to **${modelName}**.` }]);
-  };
-
-  useEffect(() => {
-    if (isOpen && !fullContext && chatbotMode !== 'admin') {
-      DBService.getAllDataForAI().then(setFullContext);
-    }
-  }, [isOpen, fullContext, chatbotMode]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
-  }, [messages]);
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-
-      setIsUploading(true);
-      try {
-          const result = await DBService.uploadFile(file);
-          const text = `Attached File: [${file.name}](${result.url})`;
-          setMessages(prev => [...prev, { role: 'user', text }]);
-          
-          if (chatbotMode === 'admin') {
-              await DBService.sendInboxMessage(
-                  currentUser?.uid || 'guest', 
-                  currentUser?.email || 'guest@obour.edu', 
-                  text,
-                  [{ url: result.url, type: result.format }]
-              );
-              setTimeout(() => {
-                 setMessages(prev => [...prev, { role: 'model', text: "File sent to admin." }]);
-              }, 500);
-          } else {
-              setTimeout(() => {
-                  setMessages(prev => [...prev, { role: 'model', text: "I've received your file. While I can't analyze it directly yet, I've noted it." }]);
-              }, 1000);
-          }
-      } catch (error) {
-          console.error(error);
-          setMessages(prev => [...prev, { role: 'model', text: "⚠️ Failed to upload file." }]);
-      } finally {
-          setIsUploading(false);
-          if (fileInputRef.current) fileInputRef.current.value = '';
-      }
   };
 
   const handleSend = async (retryText?: string) => {
     const textToSend = retryText || input;
     if (!textToSend.trim()) return;
 
-    if (!retryText) {
-       setMessages((prev) => [...prev, { role: 'user', text: textToSend }]);
-       setInput('');
-    }
-    setLoading(true);
+    if (!retryText) setInput('');
 
+    // --- ADMIN MODE ---
     if (chatbotMode === 'admin') {
+        if (!currentUser) return toast.error("Please login first");
+        
         try {
-            await DBService.sendInboxMessage(
-                currentUser?.uid || 'guest', 
-                currentUser?.email || 'guest@obour.edu', 
-                textToSend
-            ); 
-            await new Promise(resolve => setTimeout(resolve, 800));
-            setMessages((prev) => [...prev, { role: 'model', text: "Message sent to administration. We'll get back to you shortly!" }]);
-        } catch (e) {
-            setMessages((prev) => [...prev, { role: 'model', text: "⚠️ Failed to send message. Please try again." }]);
-        } finally {
-            setLoading(false);
+            await chatService.sendMessage(
+                currentUser.uid,
+                currentUser.uid, // User is sender
+                textToSend,
+                currentUser.email || 'unknown',
+                { displayName: currentUser.displayName, photoURL: currentUser.photoURL }
+            );
+            // No need to set local state, valid messages arrive via subscription!
+        } catch (e: any) {
+            toast.error(e.message || "Failed to send");
         }
         return;
     }
 
+    // --- AI MODES ---
+    setLocalMessages((prev) => [...prev, { role: 'user', text: textToSend }]);
+    setLoading(true);
+
     if (chatbotMode === 'offline') {
       await new Promise(resolve => setTimeout(resolve, 500));
       const response = getOfflineResponse(textToSend);
-      setMessages((prev) => [...prev, { role: 'model', text: response }]);
+      setLocalMessages((prev) => [...prev, { role: 'model', text: response }]);
       setLoading(false);
       return;
     }
 
     try {
+        if (!fullContext) { // Lazy load context
+           const ctx = await DBService.getAllDataForAI(); 
+           setFullContext(ctx);
+        }
         const responseText = await generateAIResponse(textToSend, fullContext, selectedModel);
-        setMessages((prev) => [...prev, { role: 'model', text: responseText }]);
+        setLocalMessages((prev) => [...prev, { role: 'model', text: responseText }]);
     } catch (error: any) {
-      console.error("AI Error:", error);
-       let errorMsg = `⚠️ **Connection Issue**\n\n`;
-       if (error?.message === '429_QUOTA' || error?.message?.includes('429_QUOTA')) {
-          errorMsg += `I'm currently overloaded. 😓\n\nSwitched to **Offline Mode** automatically. I can still help with basic questions!`;
-          setChatbotMode('offline'); 
-       } else {
-          const offlineResponse = getOfflineResponse(textToSend);
-          errorMsg += `I couldn't reach the cloud. Here is what I found in my local database:\n\n${offlineResponse}`;
-       }
-       setMessages((prev) => [...prev, { role: 'model', text: errorMsg }]);
+        setLocalMessages((prev) => [...prev, { role: 'model', text: "⚠️ I encountered an error connecting to the AI." }]);
     } finally {
       setLoading(false);
     }
   };
 
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const handleClearHistory = () => {
+      if (chatbotMode === 'admin') {
+          // Soft clear for user
+          localStorage.setItem('chat_cleared_timestamp', Date.now().toString());
+          setAdminMessages([]);
+      } else {
+          setLocalMessages([{ role: 'model', text: "Chat history cleared. How can I help you now? ✨" }]);
+      }
+      setShowClearConfirm(false);
+  };
+
+  // --- RENDER HELPERS ---
+  
+  const displayMessages = chatbotMode === 'admin' 
+    ? adminMessages.map(m => ({
+        role: m.senderId === 'admin' ? 'model' : 'user',
+        text: m.text,
+        status: m.status,
+        timestamp: m.timestamp
+      }))
+    : localMessages;
 
   const getModelLabel = () => {
     if (chatbotMode === 'admin') return 'Support';
     if (chatbotMode === 'offline') return 'Offline';
-    switch (selectedModel) {
-        case 'gemini': return 'Gemini';
-        case 'openrouter': return 'GPT-OSS';
-        case 'deepseek': return 'DeepSeek';
-        case 'kimi': return 'Kimi AI';
-        default: return 'Gemini';
-    }
+    return selectedModel === 'openrouter' ? 'GPT-OSS' : selectedModel === 'deepseek' ? 'DeepSeek' : 'Gemini';
   };
+  
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [localMessages, adminMessages, isOpen]);
 
   return (
     <>
@@ -284,7 +205,7 @@ export const AIChatbot: React.FC = () => {
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0, opacity: 0, y: 50 }}
             onClick={() => setIsOpen(true)}
-            className="fixed bottom-6 right-6 z-[9999] pointer-events-auto p-4 bg-gradient-to-tr from-indigo-600 to-purple-600 text-white rounded-full shadow-[0_10px_30px_-10px_rgba(79,70,229,0.6)] flex items-center justify-center transition-shadow animate-breath hover:shadow-indigo-500/80 hover:ring-4 hover:ring-indigo-300 dark:hover:ring-indigo-900 mb-16 md:mb-0"
+            className="fixed bottom-6 right-6 z-[9999] pointer-events-auto p-4 bg-gradient-to-tr from-indigo-600 to-purple-600 text-white rounded-full shadow-[0_10px_30px_-10px_rgba(79,70,229,0.6)] flex items-center justify-center transition-shadow animate-breath hover:shadow-indigo-500/80 hover:ring-4 hover:ring-indigo-300 mb-16 md:mb-0"
           >
             <Bot size={32} />
           </motion.button>
@@ -299,226 +220,147 @@ export const AIChatbot: React.FC = () => {
             dragControls={dragControls}
             dragListener={false}
             dragConstraints={constraintsRef}
-            dragElastic={0.05}
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20, transition: { duration: 0.2 } }}
-            transition={{ type: "spring", stiffness: 350, damping: 30 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
             style={{ 
               height: isMobile ? '85dvh' : '650px',
               position: 'fixed',
-              bottom: isMobile ? '6rem' : '1.5rem', // bottom-24 is 6rem
+              bottom: isMobile ? '6rem' : '1.5rem',
               right: isMobile ? '0' : '1.5rem',
-              top: 'auto',
               width: isMobile ? '100%' : '420px',
               borderRadius: isMobile ? '1.5rem 1.5rem 0 0' : '2rem',
-              transformOrigin: 'bottom right',
-              paddingBottom: isMobile ? 'env(safe-area-inset-bottom)' : '0'
             }}
-            className="pointer-events-auto bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl shadow-2xl flex flex-col border-0 md:border border-indigo-50 dark:border-white/10 overflow-hidden z-[9999] fixed-ios-input"
-            dir="auto"
+            className="pointer-events-auto bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl shadow-2xl flex flex-col border-0 md:border border-indigo-50 dark:border-white/10 overflow-hidden z-[9999]"
           >
             {/* Header */}
             <motion.div 
               onPointerDown={(e) => !isMobile && dragControls.start(e)}
-              className={`p-4 md:p-5 flex justify-between items-center text-white shrink-0 shadow-md z-10 cursor-grab active:cursor-grabbing select-none transition-colors duration-500 ${
+              className={`p-4 md:p-5 flex justify-between items-center text-white shrink-0 shadow-md cursor-grab active:cursor-grabbing select-none ${
                   chatbotMode === 'admin' 
                   ? 'bg-gradient-to-r from-gray-800 to-gray-900' 
                   : 'bg-gradient-to-r from-indigo-600 to-purple-600'
               }`}
             >
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+                 <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
                     {chatbotMode === 'admin' ? <Shield size={24} /> : <Bot size={24} />}
                 </div>
                 <div>
                     <h3 className="font-black text-lg leading-tight flex items-center gap-2">
-                      {chatbotMode === 'admin' ? 'Support' : 'Obour AI'}
-                      <div className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 transition-all ${
-                          chatbotMode === 'offline' ? 'bg-amber-400/30 text-amber-100' : 
-                          chatbotMode === 'admin' ? 'bg-gray-500/30 text-gray-200' : 
-                          'bg-emerald-400/30 text-emerald-100'
-                        }`}
-                      >
+                      {chatbotMode === 'admin' ? 'Live Support' : 'Obour AI'}
+                      <div className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 bg-white/20`}>
                         {chatbotMode === 'offline' ? <WifiOff size={10} /> : chatbotMode === 'admin' ? <Shield size={10}/> : <Wifi size={10} />}
                         {getModelLabel()}
                       </div>
                     </h3>
-                    <p className="text-[10px] uppercase font-bold opacity-80 tracking-widest">
-                        {chatbotMode === 'admin' ? 'Direct Message' : 'Central AI Hub'}
-                    </p>
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                  <button 
-                      onClick={() => setShowClearConfirm(true)}
-                      className="w-8 h-8 rounded-full hover:bg-white/20 flex items-center justify-center transition-colors focus:bg-white/30 active:scale-95"
-                      title="Clear History"
-                  >
-                      <Trash2 size={16} />
+                  <button onClick={() => setShowClearConfirm(true)} className="w-8 h-8 rounded-full hover:bg-white/20 flex items-center justify-center transition-colors">
+                      <Bot size={16} className="rotate-180"/> {/* Clear Icon */}
                   </button>
-                  <button 
-                      onClick={() => setIsOpen(false)} 
-                      className="w-8 h-8 rounded-full hover:bg-white/20 flex items-center justify-center transition-colors focus:bg-white/30 active:scale-95"
-                  >
+                  <button onClick={() => setIsOpen(false)} className="w-8 h-8 rounded-full hover:bg-white/20 flex items-center justify-center transition-colors">
                       <X size={20} />
                   </button>
               </div>
             </motion.div>
 
-            {/* Content Area - Gated by Auth */}
-            {!currentUser ? (
-              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50 dark:bg-gray-900">
-                  <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4 text-gray-400">
-                      <Lock size={32} />
-                  </div>
-                  <h3 className="text-xl font-bold dark:text-white mb-2">Login Required</h3>
-                  <p className="text-gray-500 text-sm mb-6">You need to sign in to chat with Obour AI.</p>
-                  <p className="text-xs text-indigo-500 font-bold">Please log in securely with your Google account.</p>
-              </div>
-            ) : (
-              <>
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-5 bg-gray-50 dark:bg-gray-950/50 custom-scrollbar scroll-smooth">
-              {messages.map((msg, idx) => (
-                <motion.div 
-                  key={idx} 
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ duration: 0.3 }}
-                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div className={`max-w-[85%] rounded-2xl px-5 py-3.5 text-sm shadow-sm relative ${
-                    msg.role === 'user' 
-                      ? 'bg-indigo-600 text-white rounded-br-none' 
-                      : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-bl-none border border-gray-100 dark:border-gray-700'
-                  }`}>
-                      <Markdown className="prose prose-sm dark:prose-invert break-words leading-relaxed text-inherit">
-                        {msg.text}
-                      </Markdown>
-                  </div>
-                </motion.div>
-              ))}
-              {loading && (
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-950/50 custom-scrollbar scroll-smooth">
+              {!currentUser && chatbotMode === 'admin' ? (
+                   <div className="flex flex-col items-center justify-center h-full text-center text-gray-500">
+                       <Lock size={32} className="mb-2"/>
+                       <p className="font-bold">Login required for support chat</p>
+                   </div>
+              ) : (
+                  displayMessages.map((msg, idx) => (
+                    <motion.div 
+                      key={idx} 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm relative Group ${
+                        msg.role === 'user' 
+                          ? 'bg-indigo-600 text-white rounded-br-none' 
+                          : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-bl-none border border-gray-100 dark:border-gray-700'
+                      }`}>
+                          <Markdown className="prose prose-sm dark:prose-invert break-words leading-relaxed text-inherit">
+                            {msg.text}
+                          </Markdown>
+                          {/* Status Icons for User Messages in Admin Mode */}
+                          {chatbotMode === 'admin' && msg.role === 'user' && (
+                              <div className="flex justify-end mt-1 opacity-70">
+                                  {msg.status === 'seen' ? <div className="flex text-blue-200"><Check size={12}/><Check size={12} className="-ml-1"/></div> :
+                                   msg.status === 'delivered' ? <div className="flex text-gray-300"><Check size={12}/><Check size={12} className="-ml-1"/></div> :
+                                   <Check size={12} className="text-gray-300"/>}
+                              </div>
+                          )}
+                      </div>
+                    </motion.div>
+                  ))
+              )}
+               {loading && (
                  <div className="flex justify-start">
-                   <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl rounded-bl-none shadow-sm border border-gray-100 dark:border-gray-700 flex gap-1.5">
-                      <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1 }} className="w-2 h-2 bg-indigo-500 rounded-full" />
-                      <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-2 h-2 bg-indigo-500 rounded-full" />
-                      <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-2 h-2 bg-indigo-500 rounded-full" />
+                   <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl rounded-bl-none shadow-sm flex gap-1.5 w-16 items-center justify-center">
+                      <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
+                      <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
+                      <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
                    </div>
                  </div>
               )}
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Config & Input Area */}
-            <div className="bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 z-20">
-                {/* Advanced Settings Bar (Bottom) */}
-                <div className="px-4 py-2 flex items-center justify-between border-b border-gray-50 dark:border-gray-800">
-                    <div className="flex gap-2">
-                         {/* Mode Switcher */}
-                         <div className="relative">
-                            <button
-                                onClick={() => setShowModelMenu(!showModelMenu)}
-                                className="flex items-center gap-1.5 text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
-                            >
-                                {chatbotMode === 'admin' ? <Shield size={14} /> : chatbotMode === 'offline' ? <WifiOff size={14} /> : <Sparkles size={14} />}
-                                {getModelLabel()}
-                                <ChevronDown size={12} />
-                            </button>
-                            
-                            {/* Dropdown Menu */}
-                            <AnimatePresence>
-                                {showModelMenu && (
-                                    <motion.div
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: 10 }}
-                                        className="absolute bottom-full left-0 mb-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden p-1.5 z-50"
-                                    >
-                                        <button onClick={() => { changeMode('online'); handleModelChange('gemini'); }} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors ${selectedModel === 'gemini' && chatbotMode === 'online' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
-                                            <Sparkles size={14} className="text-indigo-500"/> Gemini 2.5
-                                        </button>
-                                        
-                                        <button onClick={() => { changeMode('online'); handleModelChange('openrouter'); }} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors ${selectedModel === 'openrouter' && chatbotMode === 'online' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
-                                            <Globe size={14} className="text-blue-500"/> GPT-OSS (Free)
-                                        </button>
+            {/* Input */}
+            <div className="bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 p-3">
+                 {/* Mode Selector */}
+                 <div className="flex justify-between items-center px-1 mb-2">
+                     <button
+                        onClick={() => setShowModelMenu(!showModelMenu)}
+                        className="flex items-center gap-1.5 text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-indigo-600 transition-colors px-2 py-1 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                     >
+                        {chatbotMode === 'admin' ? <Shield size={12} /> : <Sparkles size={12} />}
+                        {getModelLabel()}
+                        <ChevronDown size={12} />
+                     </button>
+                     
+                     <AnimatePresence>
+                        {showModelMenu && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 10 }}
+                                className="absolute bottom-16 left-4 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden p-1.5 z-50"
+                            > 
+                                <button onClick={() => changeMode('online')} className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-xs font-bold flex gap-2"><Sparkles size={14}/> AI Assistant</button>
+                                <button onClick={() => changeMode('admin')} className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-xs font-bold flex gap-2"><Shield size={14}/> Live Support</button>
+                                <button onClick={() => changeMode('offline')} className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-xs font-bold flex gap-2"><WifiOff size={14}/> Offline Mode</button>
+                            </motion.div>
+                        )}
+                     </AnimatePresence>
+                 </div>
 
-                                        <button onClick={() => { changeMode('online'); handleModelChange('deepseek'); }} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors ${selectedModel === 'deepseek' && chatbotMode === 'online' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
-                                            <Brain size={14} className="text-purple-500"/> DeepSeek V3
-                                        </button>
-
-                                        <button onClick={() => { changeMode('online'); handleModelChange('kimi'); }} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors ${selectedModel === 'kimi' && chatbotMode === 'online' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
-                                            <MessageSquare size={14} className="text-pink-500"/> Kimi AI
-                                        </button>
-                                        
-                                        <div className="h-px bg-gray-100 dark:bg-gray-700 my-1"/>
-                                        <p className="px-2 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">System</p>
-                                        
-                                        <button onClick={() => changeMode('offline')} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 ${chatbotMode === 'offline' ? 'bg-amber-50 text-amber-600' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
-                                            <WifiOff size={14} className="text-amber-500"/> Offline Mode
-                                        </button>
-                                        <button onClick={() => changeMode('admin')} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 ${chatbotMode === 'admin' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
-                                            <Shield size={14} className="text-gray-500"/> Contact Support
-                                        </button>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                         </div>
-                    </div>
-                </div>
-
-                {/* Input Field */}
-                <motion.div 
-                  layout
-                  className="p-3 md:p-4 flex gap-3 items-end sticky bottom-0 pb-safe"
-                >
-                  <input 
-                      type="file" 
-                      ref={fileInputRef} 
-                      className="hidden" 
-                      onChange={handleFileUpload}
-                      accept="image/*,application/pdf"
-                  />
-                  <button 
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={loading || isUploading}
-                      className="p-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                      title="Upload file (Image or PDF)"
-                  >
-                      {isUploading ? <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full"/> : <Paperclip size={20} />}
-                  </button>
-
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    autoFocus={!isMobile}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                    placeholder={chatbotMode === 'admin' ? "Message details..." : `Ask ${getModelLabel()}...`}
-                    className="flex-1 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-2xl px-5 py-3.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm font-medium placeholder-gray-400 transition-all"
-                  />
-                  <motion.button 
-                    onClick={() => handleSend()} 
-                    disabled={!input.trim() || loading} 
-                    whileTap={{ scale: 0.95 }}
-                    className={`w-12 h-12 text-white rounded-2xl shadow-lg flex items-center justify-center disabled:opacity-50 disabled:shadow-none transition-all shrink-0 ${
-                        chatbotMode === 'admin'
-                        ? 'bg-gray-800 hover:bg-gray-900 shadow-gray-500/30'
-                        : selectedModel === 'openrouter'
-                        ? 'bg-gradient-to-br from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 shadow-blue-500/30'
-                        : selectedModel === 'deepseek'
-                        ? 'bg-gradient-to-br from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 shadow-purple-500/30'
-                        : 'bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-indigo-500/30'
-                    }`}
-                  >
-                    <Send size={20} />
-                  </motion.button>
-                </motion.div>
+                 <div className="flex gap-2 items-center">
+                    <input
+                        ref={inputRef}
+                        type="text"
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                        placeholder={chatbotMode === 'admin' ? "Message support..." : "Ask me anything..."}
+                        className="flex-1 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm font-medium"
+                    />
+                    <button 
+                        onClick={() => handleSend()}
+                        disabled={!input.trim()}
+                        className="p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-lg shadow-indigo-500/30"
+                    >
+                        <Send size={20} />
+                    </button>
+                 </div>
             </div>
-              </>
-            )}
 
           </motion.div>
         )}
@@ -527,13 +369,9 @@ export const AIChatbot: React.FC = () => {
       <ConfirmationModal
          isOpen={showClearConfirm}
          onClose={() => setShowClearConfirm(false)}
-         onConfirm={() => {
-             localStorage.removeItem('chat_history');
-             setMessages([{ role: 'model', text: "Chat history cleared. How can I help you now? ✨" }]);
-             setShowClearConfirm(false);
-         }}
+         onConfirm={handleClearHistory}
          title="Clear History?"
-         message="Are you sure you want to delete your entire conversation history? This cannot be undone."
+         message="Are you sure you want to delete your conversation history? This cannot be undone."
       />
     </>
   );

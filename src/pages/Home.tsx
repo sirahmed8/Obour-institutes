@@ -170,51 +170,20 @@ export const Home: React.FC = () => {
               {/* Sort Dropdown */}
               <div className="relative shrink-0" ref={sortRef}>
                   <button
-                    onClick={() => setIsSortOpen(!isSortOpen)}
-                    className="h-full min-w-[160px] bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl px-4 py-3 flex items-center gap-3 shadow-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors justify-between"
-                  >
-                      <div className="flex items-center gap-3">
-                          <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400 shrink-0">
-                              <BookOpen size={18} />
-                          </div>
-                          <div className="flex flex-col text-start overflow-hidden">
-                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider truncate">{t('sort_by')}</span>
-                              <span className="text-sm font-bold text-gray-800 dark:text-gray-200 truncate">
-                                {sortOptions.find(o => o.value === sortOption)?.label}
-                              </span>
-                          </div>
-                      </div>
-                      <ChevronDown className={`shrink-0 text-gray-400 transition-transform ${isSortOpen ? 'rotate-180' : ''}`} size={16} />
-                  </button>
-                  
-                  <AnimatePresence>
-                    {isSortOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="absolute top-full mt-2 end-0 bg-white/90 dark:bg-slate-900/80 backdrop-blur-xl border border-gray-100 dark:border-white/10 rounded-xl shadow-lg overflow-hidden z-50 min-w-[160px]"
-                      >
-                        {sortOptions.map(option => (
-                          <button
-                            key={option.value}
-                            onClick={() => {
-                              setSortOption(option.value);
-                              setIsSortOpen(false);
-                            }}
-                            className={`w-full text-start px-4 py-3 text-sm font-medium transition-colors ${
-                              sortOption === option.value 
-                                ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' 
-                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                            }`}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-              </div>
+              <div className="md:w-64 z-20"> 
+               <CustomSelect
+                  value={sortOption}
+                  onChange={(val) => setSortOption(val as SortOption)}
+                  options={[
+                      { value: 'name_az', label: 'Name (A-Z)', icon: <ArrowDownUp size={16}/> },
+                      { value: 'name_za', label: 'Name (Z-A)', icon: <ArrowDownUp size={16}/> },
+                      { value: 'date_new', label: 'Newest First', icon: <Clock size={16}/> },
+                      { value: 'date_old', label: 'Oldest First', icon: <Clock size={16}/> }
+                  ]}
+                  placeholder="Sort By..."
+                  className="w-full"
+               />
+            </div>
         </div>
       </div>
 

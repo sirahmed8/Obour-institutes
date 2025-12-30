@@ -115,3 +115,30 @@ export const COLOR_PALETTE = [
   { name: 'Lime', class: 'bg-lime-500' },
   { name: 'Fuchsia', class: 'bg-fuchsia-500' },
 ];
+
+// --- Chat & Support ---
+export interface Message {
+  id: string;
+  text: string;
+  senderId: string; // 'admin' or userId
+  senderEmail?: string;
+  timestamp: any;
+  status: 'sent' | 'delivered' | 'seen';
+  type: 'text' | 'file' | 'audio' | 'image';
+  fileUrl?: string; // For attachments
+  reactions?: Record<string, string>; // { userId: '👍' }
+  isDeleted?: boolean;
+  replyTo?: { id: string; text: string; sender: string } | null;
+}
+
+export interface Conversation {
+  id: string; // userId
+  userEmail: string;
+  displayName?: string;
+  photoURL?: string; // Cached profile pic
+  lastMessage: string;
+  lastMessageTimestamp: any;
+  unreadCount: number; // For admin
+  userUnreadCount?: number; // For user
+  isArchived?: boolean;
+}

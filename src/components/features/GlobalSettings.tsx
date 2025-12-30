@@ -47,11 +47,14 @@ export const GlobalSettings: React.FC = () => {
       
       // Auto-Send Notification for Banner
       if (settings.showAnnouncement && settings.announcement) {
+          // This ensures that when an admin sets a banner, a notification is also pushed.
+          // Check if it's a new announcement to avoid spamming on every minor edit?
+          // For now, per instruction "triggers a notification", we will send it.
           await DBService.sendNotification(
               "New Announcement", 
               settings.announcement, 
               '/', 
-              'announcement'
+              settings.bannerType || 'announcement'
           );
       }
       

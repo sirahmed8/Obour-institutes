@@ -110,57 +110,52 @@ export const Banner: React.FC = () => {
     <AnimatePresence>
       {isVisible && (
         <motion.div
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: 'auto', opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
+          initial={{ y: -100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: -100, opacity: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="overflow-hidden"
+          className="fixed top-0 left-0 right-0 z-[100] shadow-xl"
         >
           <div className={`bg-gradient-to-r ${style.gradient} text-white`}>
             <div className="max-w-7xl mx-auto px-4 py-3 sm:px-6 lg:px-8">
-              <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-start sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3 flex-1">
                   <motion.div
                     initial={{ scale: 0 }}
                     animate={{ scale: 1, rotate: [0, -10, 10, 0] }}
-                    transition={{ delay: 0.2, duration: 0.5 }}
-                    className="p-2 bg-white/20 rounded-xl backdrop-blur-sm"
+                    transition={{ delay: 0.3, duration: 0.5 }}
+                    className="p-2 bg-white/20 rounded-xl backdrop-blur-sm shrink-0"
                   >
                     <Icon size={20} />
                   </motion.div>
                   <motion.p
                     initial={{ x: -20, opacity: 0 }}
                     animate={{ x: 0, opacity: 1 }}
-                    transition={{ delay: 0.1 }}
-                    className="font-bold text-sm sm:text-base"
+                    transition={{ delay: 0.2 }}
+                    className="font-bold text-sm sm:text-base leading-tight"
                   >
                     {banner.text}
                   </motion.p>
                 </div>
                 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
                   {/* Dismiss forever button */}
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                  <button
                     onClick={handleDismissPermanently}
                     className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold bg-white/20 hover:bg-white/30 rounded-full transition-colors whitespace-nowrap"
                     title="Don't show again"
                   >
                     <BellOff size={14} />
                     <span className="hidden sm:inline">Don't show again</span>
-                  </motion.button>
+                  </button>
                   
                   {/* Dismiss once button */}
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
+                  <button
                     onClick={handleDismissOnce}
                     className="p-1.5 hover:bg-white/20 rounded-full transition-colors"
-                    title="Dismiss for now"
                   >
-                    <X size={18} />
-                  </motion.button>
+                    <X size={20} />
+                  </button>
                 </div>
               </div>
             </div>

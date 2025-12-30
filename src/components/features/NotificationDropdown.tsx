@@ -88,31 +88,32 @@ export const NotificationDropdown: React.FC = () => {
                                     <div 
                                         key={n.id}
                                         onClick={() => { navigate(n.link); setIsOpen(false); }}
-                                        className="p-4 border-b border-gray-50 dark:border-gray-700/30 hover:bg-gray-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group relative"
+                                        className="p-4 border-b border-gray-50 dark:border-gray-700/30 hover:bg-gray-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group relative flex items-start gap-3"
                                     >
-                                        <div className="flex justify-between items-start mb-1">
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
-                                                n.type === 'file' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20' : 
-                                                n.type === 'announcement' ? 'bg-purple-50 text-purple-600 dark:bg-purple-900/20' : 
-                                                'bg-gray-100 text-gray-500 dark:bg-gray-700'
-                                            }`}>
-                                                {n.type || 'Alert'}
-                                            </span>
-                                            <div className="flex items-center gap-2">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex justify-between items-start mb-1">
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                                                    n.type === 'file' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20' : 
+                                                    n.type === 'announcement' ? 'bg-purple-50 text-purple-600 dark:bg-purple-900/20' : 
+                                                    'bg-gray-100 text-gray-500 dark:bg-gray-700'
+                                                }`}>
+                                                    {n.type || 'Alert'}
+                                                </span>
                                                 <span className="text-[10px] text-gray-400 flex items-center gap-1">
                                                     <Clock size={10}/>
                                                     {new Date(n.createdAt).toLocaleDateString()}
                                                 </span>
-                                                <button 
-                                                    onClick={(e) => handleDelete(e, n.id)}
-                                                    className="text-gray-300 hover:text-red-500 transition-colors p-1"
-                                                >
-                                                    <Trash2 size={12} />
-                                                </button>
                                             </div>
+                                            <h4 className="font-bold text-gray-800 dark:text-gray-200 text-sm mb-1 group-hover:text-indigo-600 transition-colors line-clamp-1">{n.title}</h4>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{n.body}</p>
                                         </div>
-                                        <h4 className="font-bold text-gray-800 dark:text-gray-200 text-sm mb-1 group-hover:text-indigo-600 transition-colors line-clamp-1 pr-6">{n.title}</h4>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{n.body}</p>
+                                        <button 
+                                            onClick={(e) => handleDelete(e, n.id)}
+                                            className="text-gray-300 hover:text-red-500 transition-colors p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg shrink-0 self-center"
+                                            title="Remove"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
                                     </div>
                                 ))
                             )}

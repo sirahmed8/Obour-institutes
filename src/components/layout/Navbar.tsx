@@ -24,7 +24,7 @@ export const Navbar: React.FC = () => {
   // Use new hook for cleaner code
   useClickOutside(dropdownRef, () => setIsDropdownOpen(false));
 
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   
   // "Feature": Persist Email Subscription 
   const [emailSubscribed, setEmailSubscribed] = useState(() => localStorage.getItem('email_sub') === 'true');
@@ -41,7 +41,7 @@ export const Navbar: React.FC = () => {
   };
 
   const toggleDropdown = () => setIsDropdownOpen(!isDropdownOpen);
-  const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
+
 
   return (
     <>
@@ -136,101 +136,95 @@ export const Navbar: React.FC = () => {
                       <ChevronDown size={14} className={`text-gray-500 mr-1 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
                     </motion.button>
 
-                    <AnimatePresence>
-                      {isDropdownOpen && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 15, scale: 0.95, rotateX: -15 }}
-                          animate={{ opacity: 1, y: 0, scale: 1, rotateX: 0 }}
-                          exit={{ opacity: 0, y: 15, scale: 0.95, rotateX: -15 }}
-                          transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                          className="absolute right-0 rtl:right-auto rtl:left-0 mt-4 w-72 bg-white/80 dark:bg-slate-900/90 backdrop-blur-xl rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] border border-white/20 dark:border-white/10 overflow-hidden ring-1 ring-black/5 z-50 origin-top-right rtl:origin-top-left text-left"
-                        >
-                           <div className="p-5 border-b border-gray-100 dark:border-gray-700/50 relative overflow-hidden">
-                              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 dark:from-indigo-900/40 dark:to-purple-900/40 z-0"/>
-                              <div className="relative z-10 flex items-center gap-4">
-                                <div className="relative shrink-0">
-                                    <img 
-                                      src={currentUser.photoURL || ''} 
-                                      alt="Profile" 
-                                      className="h-12 w-12 rounded-2xl object-cover shadow-lg border-2 border-white dark:border-gray-600"
-                                    />
-                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white dark:border-gray-800 rounded-full"/>
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="font-bold text-gray-900 dark:text-white text-base leading-tight break-words">
-                                        {currentUser.displayName}
-                                    </p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 font-mono opacity-80 mt-0.5 truncate">
-                                        {currentUser.email}
-                                    </p>
-                                </div>
+                       <AnimatePresence>
+                         {isDropdownOpen && (
+                           <motion.div
+                             initial={{ opacity: 0, y: 15, scale: 0.95, rotateX: -15 }}
+                             animate={{ opacity: 1, y: 0, scale: 1, rotateX: 0 }}
+                             exit={{ opacity: 0, y: 15, scale: 0.95, rotateX: -15 }}
+                             transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                             style={{ transform: 'translateZ(0)' }} // Hardware acceleration
+                             className="absolute right-0 rtl:right-auto rtl:left-0 mt-4 w-72 bg-white dark:bg-slate-900 rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] border border-gray-100 dark:border-gray-800 overflow-hidden ring-1 ring-black/5 z-50 origin-top-right rtl:origin-top-left text-left transform-gpu"
+                           >
+                              <div className="p-5 border-b border-gray-100 dark:border-gray-700/50 relative overflow-hidden">
+                                 <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 dark:from-indigo-900/40 dark:to-purple-900/40 z-0"/>
+                                 <div className="relative z-10 flex items-center gap-4">
+                                   <div className="relative shrink-0">
+                                       <img 
+                                         src={currentUser.photoURL || ''} 
+                                         alt="Profile" 
+                                         className="h-12 w-12 rounded-2xl object-cover shadow-lg border-2 border-white dark:border-gray-600"
+                                       />
+                                       <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white dark:border-gray-800 rounded-full"/>
+                                   </div>
+                                   <div className="flex-1 min-w-0">
+                                       <p className="font-bold text-gray-900 dark:text-white text-base leading-tight break-words">
+                                           {currentUser.displayName}
+                                       </p>
+                                       <p className="text-xs text-indigo-600 dark:text-indigo-400 font-mono font-bold mt-0.5 truncate">
+                                           {/* Display Student Code or Role */}
+                                           {(currentUser as any).studentCode ? `#${(currentUser as any).studentCode}` : currentUser.email}
+                                       </p>
+                                   </div>
+                                 </div>
                               </div>
-                           </div>
-
-                           <div className="p-2 space-y-1.5">
-                              {/* Theme Selector Pilled */}
-                              <div className="p-2 bg-gray-50/50 dark:bg-gray-900/50 rounded-2xl mb-2">
-                                  <div className="grid grid-cols-3 gap-1">
-                                      {(['light', 'system', 'dark'] as const).map((mode) => (
-                                          <button
-                                              key={mode}
-                                              onClick={() => setTheme(mode)}
-                                              className={`flex flex-col items-center justify-center py-2 rounded-xl transition-all duration-200 ${
-                                                theme === mode 
-                                                  ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm font-bold scale-105' 
-                                                  : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                                              }`}
-                                          >
-                                              {mode === 'light' ? <Sun size={18} className={theme===mode ? "fill-orange-400 text-orange-400":""}/> : 
-                                               mode === 'dark' ? <Moon size={18} className={theme===mode ? "fill-indigo-400 text-indigo-400":""}/> : 
-                                               <Monitor size={18} />}
-                                              <span className="text-[10px] mt-1 capitalize font-medium">{mode}</span>
-                                          </button>
-                                      ))}
-                                  </div>
-                              </div>
-
-                              <button 
-                                onClick={() => {
-                                  if (Notification.permission === 'granted') {
-                                     toast("To disable notifications, please change your browser settings.", { icon: 'ℹ️' });
-                                  } else {
-                                     Notification.requestPermission();
-                                  }
-                                }}
-                                className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all group"
-                              >
-                                   <div className="flex items-center gap-3">
-                                       <div className={`p-2 rounded-lg transition-colors ${Notification.permission === 'granted' ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : 'bg-gray-100 text-gray-400 dark:bg-gray-800'}`}>
-                                           <BellRing size={16} />
-                                       </div>
-                                       <div className="text-left">
-                                           <p className="text-sm font-bold text-gray-700 dark:text-gray-200">Push Notifications</p>
-                                           <p className="text-[10px] text-gray-400">{Notification.permission === 'granted' ? 'Active' : 'Tap to enable'}</p>
-                                       </div>
-                                   </div>
-                                   <div className={`w-8 h-4 rounded-full relative transition-colors ${Notification.permission === 'granted' ? 'bg-indigo-500' : 'bg-gray-300 dark:bg-gray-600'}`}>
-                                        <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all shadow-sm ${Notification.permission === 'granted' ? 'left-4.5' : 'left-0.5'}`} style={{ left: Notification.permission === 'granted' ? 'calc(100% - 14px)' : '2px' }}/>
-                                   </div>
-                              </button>
-
-                              <button 
-                                onClick={toggleEmailSub}
-                                className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all group"
-                              >
-                                   <div className="flex items-center gap-3">
-                                       <div className={`p-2 rounded-lg transition-colors ${emailSubscribed ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : 'bg-gray-100 text-gray-400 dark:bg-gray-800'}`}>
-                                           <Mail size={16} />
-                                       </div>
-                                       <div className="text-left">
-                                           <p className="text-sm font-bold text-gray-700 dark:text-gray-200">{t('email_updates')}</p>
-                                           <p className="text-[10px] text-gray-400">Weekly digest</p>
-                                       </div>
-                                   </div>
-                                   <div className={`w-8 h-4 rounded-full relative transition-colors ${emailSubscribed ? 'bg-indigo-500' : 'bg-gray-300 dark:bg-gray-600'}`}>
-                                        <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all shadow-sm ${emailSubscribed ? 'left-4.5' : 'left-0.5'}`} style={{ left: emailSubscribed ? 'calc(100% - 14px)' : '2px' }}/>
-                                   </div>
-                              </button>
+   
+                              <div className="p-2 space-y-1.5">
+                                 {/* Theme Selector Pilled */}
+                                 <div className="p-2 bg-gray-50/50 dark:bg-gray-900/50 rounded-2xl mb-2">
+                                     <div className="grid grid-cols-3 gap-1">
+                                         {(['light', 'system', 'dark'] as const).map((mode) => (
+                                             <button
+                                                 key={mode}
+                                                 onClick={() => setTheme(mode)}
+                                                 className={`flex flex-col items-center justify-center py-2 rounded-xl transition-all duration-200 ${
+                                                   theme === mode 
+                                                     ? 'bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 shadow-sm font-bold scale-105' 
+                                                     : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                                                 }`}
+                                             >
+                                                 {mode === 'light' ? <Sun size={18} className={theme===mode ? "fill-orange-400 text-orange-400":""}/> : 
+                                                  mode === 'dark' ? <Moon size={18} className={theme===mode ? "fill-indigo-400 text-indigo-400":""}/> : 
+                                                  <Monitor size={18} />}
+                                                 <span className="text-[10px] mt-1 capitalize font-medium">{mode}</span>
+                                             </button>
+                                         ))}
+                                     </div>
+                                 </div>
+   
+                                 <div className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all group">
+                                      <div className="flex items-center gap-3">
+                                          <div className={`p-2 rounded-lg transition-colors ${Notification.permission === 'granted' ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : 'bg-gray-100 text-gray-400 dark:bg-gray-800'}`}>
+                                              <BellRing size={16} />
+                                          </div>
+                                          <div className="text-left">
+                                              <p className="text-sm font-bold text-gray-700 dark:text-gray-200">Push Notifications</p>
+                                              <p className="text-[10px] text-gray-400">{Notification.permission === 'granted' ? 'Active' : 'Tap to enable'}</p>
+                                          </div>
+                                      </div>
+                                      <Switch 
+                                        checked={Notification.permission === 'granted'} 
+                                        onChange={() => {
+                                             if (Notification.permission === 'granted') {
+                                                toast("To disable notifications, please change your browser settings.", { icon: 'ℹ️' });
+                                             } else {
+                                                Notification.requestPermission();
+                                             }
+                                        }} 
+                                      />
+                                 </div>
+   
+                                 <div className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all group">
+                                      <div className="flex items-center gap-3">
+                                          <div className={`p-2 rounded-lg transition-colors ${emailSubscribed ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : 'bg-gray-100 text-gray-400 dark:bg-gray-800'}`}>
+                                              <Mail size={16} />
+                                          </div>
+                                          <div className="text-left">
+                                              <p className="text-sm font-bold text-gray-700 dark:text-gray-200">{t('email_updates')}</p>
+                                          </div>
+                                      </div>
+                                      <Switch checked={emailSubscribed} onChange={toggleEmailSub} />
+                                 </div>
 
                               <button 
                                 onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')}

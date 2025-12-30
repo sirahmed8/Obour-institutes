@@ -126,9 +126,7 @@ const AppContent: React.FC = () => {
             } />
           </Routes>
         </Suspense>
-        <AIChatbot />
-        <StudentProfileSetup />
-        <CookieConsent />
+
         
         <AnimatePresence>
           {showNotifPrompt && (
@@ -146,6 +144,9 @@ const AppContent: React.FC = () => {
           )}
         </AnimatePresence>
       </Layout>
+      <AIChatbot />
+      <StudentProfileSetup />
+      <CookieConsent />
     </>
   );
 };

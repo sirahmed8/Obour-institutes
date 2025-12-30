@@ -1,402 +1,385 @@
-import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '../../../services/firebase';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, Trash2, Check, Archive, Paperclip, Mail, Shield, User, FileText, Send, X } from 'lucide-react';
+import { MessageCircle, Trash2, Check, CheckCircle, Clock, Paperclip, Send, X, Search, MoreVertical, Smile, Reply } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { DBService } from '../../../services/storage';
-import { Subject, ResourceType } from '../../../types';
+import { chatService } from '../../../services/chatService';
+import { Conversation, Message, ResourceType } from '../../../types';
 import { ConfirmationModal } from '../../ui/ConfirmationModal';
+import { DBService } from '../../../services/storage';
+import { Subject } from '../../../types';
+
+// Emoji Picker (Simulated or Lightweight)
+const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '👏', '🔥'];
 
 interface InboxProps {
-    subjects?: Subject[];
+    subjects?: Subject[]; 
 }
 
 export const Inbox: React.FC<InboxProps> = ({ subjects = [] }) => {
-    const [messages, setMessages] = useState<any[]>([]);
+    // --- State ---
+    const [conversations, setConversations] = useState<Conversation[]>([]);
+    const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
+    const [messages, setMessages] = useState<Message[]>([]);
+    
+    // UI State
     const [loading, setLoading] = useState(true);
-    const [selectedMessage, setSelectedMessage] = useState<any>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [inputText, setInputText] = useState('');
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+    
+    // Modals
+    const [deleteMsgId, setDeleteMsgId] = useState<string | null>(null);
+    const [showPromoteModal, setShowPromoteModal] = useState(false); // Kept for future use if needed, though hidden for now per new design focus
+    
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Promote Modal State
-    const [showPromoteModal, setShowPromoteModal] = useState(false);
-    const [attachmentToPromote, setAttachmentToPromote] = useState<{url: string, type: string, name?: string} | null>(null);
-    const [promoteSubjectId, setPromoteSubjectId] = useState('');
-    const [promoteTitle, setPromoteTitle] = useState('');
-    const [promoteDescription, setPromoteDescription] = useState('');
-    const [deleteId, setDeleteId] = useState<string | null>(null);
-    const [isPromoting, setIsPromoting] = useState(false);
+    // --- Effects ---
 
+    // 1. Subscribe to Conversations (Left Sidebar)
     useEffect(() => {
-        const q = query(collection(db, 'inbox'), orderBy('timestamp', 'desc'), limit(100));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const unsubscribe = chatService.subscribeToAllConversations((convs) => {
+            setConversations(convs);
             setLoading(false);
         });
         return () => unsubscribe();
     }, []);
 
-    const markAsRead = async (id: string, currentStatus: boolean) => {
-        if (currentStatus) return;
-        try {
-            await updateDoc(doc(db, 'inbox', id), { read: true });
-            toast.success('Marked as read');
-        } catch (e) { console.error(e); }
-    };
+    // 2. Subscribe to Messages (Right Chat Window)
+    useEffect(() => {
+        if (!selectedConvId) {
+            setMessages([]);
+            return;
+        }
 
-    const handleDeleteClick = (id: string) => {
-        setDeleteId(id);
-    };
-
-    const confirmDelete = async () => {
-        if (!deleteId) return;
-        try {
-            await deleteDoc(doc(db, 'inbox', deleteId));
-            toast.success('Message deleted');
-            if (selectedMessage?.id === deleteId) setSelectedMessage(null);
-        } catch (e) { toast.error('Failed to delete'); }
-        setDeleteId(null);
-    };
-
-    const handlePromoteClick = (att: any, index: number) => {
-        setAttachmentToPromote({
-            url: att.url,
-            type: att.type || 'FILE',
-            name: `User Upload ${index + 1}`
+        const unsubscribe = chatService.subscribeToMessages(selectedConvId, (msgs) => {
+            setMessages(msgs);
+            // Auto scroll to bottom
+            setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+            
+            // Auto mark as seen
+            chatService.markAsSeen(selectedConvId, 'admin');
         });
-        setPromoteTitle(`User Resource: ${att.type || 'File'}`);
-        setPromoteDescription(`Contributed by ${selectedMessage?.userEmail}`);
-        setShowPromoteModal(true);
-    };
 
-    const handlePromoteSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!promoteSubjectId) return toast.error("Select a subject");
-        if (!attachmentToPromote) return;
+        return () => unsubscribe();
+    }, [selectedConvId]);
 
-        setIsPromoting(true);
+    // --- Handlers ---
+
+    const handleSendMessage = async () => {
+        if (!inputText.trim() || !selectedConvId) return;
+
         try {
-             // Determine Type
-             let rType = ResourceType.LINK;
-             if (attachmentToPromote.type.toLowerCase().includes('pdf')) rType = ResourceType.PDF;
-             
-             await DBService.addResource({
-                 subjectId: promoteSubjectId,
-                 title: promoteTitle,
-                 description: promoteDescription,
-                 url: attachmentToPromote.url,
-                 type: rType
-             });
-
-             toast.success("Promoted to Resources!");
-             setShowPromoteModal(false);
-             // Optionally auto-reply to user
-             await DBService.sendInboxMessage(
-                 'system', 
-                 'admin@obour.edu', 
-                 `Your submission has been approved and added to the method!`,
-                 []
-             );
-
-        } catch (e) {
-            console.error(e);
-            toast.error("Failed to promote");
-        } finally {
-            setIsPromoting(false);
+            const selectedConv = conversations.find(c => c.id === selectedConvId);
+            await chatService.sendMessage(
+                selectedConvId,
+                'admin',
+                inputText,
+                'admin@obour.edu',
+                undefined,
+                replyingTo ? { id: replyingTo.id, text: replyingTo.text, sender: replyingTo.senderId } : undefined
+            );
+            setInputText('');
+            setReplyingTo(null);
+        } catch (e: any) {
+            toast.error(e.message || "Failed to send");
         }
     };
 
-    const [searchTerm, setSearchTerm] = useState('');
+    const handleDeleteMessage = async () => {
+        if (!deleteMsgId || !selectedConvId) return;
+        try {
+            await chatService.deleteMessage(selectedConvId, deleteMsgId);
+            toast.success("Message deleted");
+            setDeleteMsgId(null);
+        } catch (e) {
+            toast.error("Failed to delete");
+        }
+    };
 
-    const filteredMessages = messages.filter(msg => 
-        msg.userEmail.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        msg.message.toLowerCase().includes(searchTerm.toLowerCase())
+    const handleReaction = async (msgId: string, emoji: string) => {
+        if (!selectedConvId) return;
+        await chatService.toggleReaction(selectedConvId, msgId, 'admin', emoji);
+        setShowEmojiPicker(false);
+    };
+
+    // Filter conversations
+    const filteredConvs = conversations.filter(c => 
+        c.userEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.displayName?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    const selectedConversation = conversations.find(c => c.id === selectedConvId);
+
+    // --- Icon Helper ---
+    const StatusIcon = ({ status }: { status: Message['status'] }) => {
+        if (status === 'seen') return <div className="flex"><Check size={14} className="text-blue-500"/><Check size={14} className="text-blue-500 -ml-2"/></div>;
+        if (status === 'delivered') return <div className="flex"><Check size={14} className="text-gray-400"/><Check size={14} className="text-gray-400 -ml-2"/></div>;
+        return <Check size={14} className="text-gray-300"/>; // Sent
+    };
+
     return (
-        <div className="h-full flex flex-col md:flex-row gap-6 h-[calc(100vh-140px)] relative">
-            <ConfirmationModal
-                isOpen={!!deleteId}
-                onClose={() => setDeleteId(null)}
-                onConfirm={confirmDelete}
+        <div className="flex flex-col md:flex-row h-[calc(100vh-140px)] gap-6 relative overflow-hidden">
+            {/* Delete Modal */}
+            <ConfirmationModal 
+                isOpen={!!deleteMsgId}
+                onClose={() => setDeleteMsgId(null)}
+                onConfirm={handleDeleteMessage}
                 title="Delete Message"
-                message="Are you sure you want to delete this message? This action cannot be undone."
+                message="Are you sure? This message will be removed for everyone."
             />
-            {/* Promotion Modal */}
-            <AnimatePresence>
-                {showPromoteModal && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                        <motion.div 
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.9 }}
-                            className="bg-white dark:bg-gray-800 rounded-3xl p-8 w-full max-w-md shadow-2xl border border-gray-100 dark:border-gray-700"
-                        >
-                            <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
-                                    <FileText className="text-indigo-600"/> Promote Resource
-                                </h3>
-                                <button onClick={() => setShowPromoteModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors">
-                                    <X size={20} className="text-gray-500"/>
-                                </button>
-                            </div>
-                            
-                            <form onSubmit={handlePromoteSubmit} className="space-y-4">
-                                <div>
-                                    <label className="block text-xs font-black uppercase text-gray-400 mb-2 tracking-wider">Target Subject</label>
-                                    <select 
-                                        value={promoteSubjectId} 
-                                        onChange={e => setPromoteSubjectId(e.target.value)}
-                                        className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white appearance-none cursor-pointer font-bold"
-                                        required
-                                    >
-                                        <option value="">Select a Course...</option>
-                                        {subjects?.map(s => (
-                                            <option key={s.id} value={s.id}>{s.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                
-                                <div>
-                                    <label className="block text-xs font-black uppercase text-gray-400 mb-2 tracking-wider">Title</label>
-                                    <input 
-                                        value={promoteTitle}
-                                        onChange={e => setPromoteTitle(e.target.value)}
-                                        className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white font-bold"
-                                        required
-                                    />
-                                </div>
 
-                                <div>
-                                    <label className="block text-xs font-black uppercase text-gray-400 mb-2 tracking-wider">Description</label>
-                                    <input 
-                                        value={promoteDescription}
-                                        onChange={e => setPromoteDescription(e.target.value)}
-                                        className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white font-medium text-sm"
-                                    />
-                                </div>
-
-                                <button 
-                                    type="submit" 
-                                    disabled={isPromoting}
-                                    className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/30 flex items-center justify-center gap-2 mt-4"
-                                >
-                                    {isPromoting ? 'Processing...' : <><Check size={20} /> Approve & Publish</>}
-                                </button>
-                            </form>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
-
-            {/* Message List */}
-            <div className="w-full md:w-1/3 bg-white dark:bg-gray-800 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col">
+            {/* --- CONVERSATION LIST (SIDEBAR) --- */}
+            <div className={`w-full md:w-1/3 bg-white dark:bg-gray-800 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col ${selectedConvId ? 'hidden md:flex' : 'flex'}`}>
+                {/* Header */}
                 <div className="p-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                    <h2 className="font-black text-xl flex items-center gap-2 text-gray-900 dark:text-white">
-                        <MessageCircle className="text-indigo-500" /> Inbox
-                        <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">{messages.length}</span>
+                    <h2 className="font-black text-xl flex items-center gap-2 text-gray-900 dark:text-white mb-4">
+                        <MessageCircle className="text-indigo-500" /> Conversations
+                        <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">{conversations.length}</span>
                     </h2>
-                    <div className="mt-4 flex items-center justify-between gap-2">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16}/>
                         <input 
                             type="text" 
-                            placeholder="Search inbox..." 
+                            placeholder="Search students..." 
                             value={searchTerm}
-                            className="w-full bg-white dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow"
+                            className="w-full bg-white dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold transition-all"
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
-                         <button onClick={() => setSearchTerm('')} className="text-xs font-bold text-indigo-400 hover:text-indigo-600 hover:underline shrink-0 transition-colors">
-                            View All
-                        </button>
                     </div>
                 </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
-                    {filteredMessages.map((msg) => (
-                        <motion.div
-                            key={msg.id}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            onClick={() => { setSelectedMessage(msg); markAsRead(msg.id, msg.read); }}
-                            className={`p-4 rounded-2xl cursor-pointer transition-all border-2 group ${
-                                selectedMessage?.id === msg.id
-                                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
-                                : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                            } ${!msg.read ? 'bg-white dark:bg-gray-800' : 'opacity-80'}`}
+
+                {/* List */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                    {filteredConvs.map((conv) => (
+                        <div 
+                            key={conv.id}
+                            onClick={() => setSelectedConvId(conv.id)}
+                            className={`p-4 rounded-2xl cursor-pointer transition-all border group relative flex items-center gap-4 ${
+                                selectedConvId === conv.id
+                                ? 'bg-indigo-600 border-indigo-600'
+                                : 'bg-transparent hover:bg-gray-50 dark:hover:bg-gray-700/50 border-transparent hover:border-gray-100 dark:hover:border-gray-700'
+                            }`}
                         >
-                            <div className="flex justify-between items-start mb-1">
-                                <span className={`text-xs font-bold ${!msg.read ? 'text-indigo-600' : 'text-gray-500'}`}>
-                                    {msg.userEmail.split('@')[0]}
-                                </span>
-                                <span className="text-[10px] text-gray-400">
-                                    {new Date(msg.timestamp).toLocaleDateString()}
-                                </span>
+                            {/* Avatar */}
+                            {conv.photoURL ? (
+                                <img src={conv.photoURL} alt="User" className="w-12 h-12 rounded-full object-cover border-2 border-white dark:border-gray-600" />
+                            ) : (
+                                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-lg ${
+                                    selectedConvId === conv.id ? 'bg-white/20 text-white' : 'bg-indigo-100 dark:bg-indigo-900 text-indigo-600'
+                                }`}>
+                                    {conv.displayName ? conv.displayName[0] : conv.userEmail[0].toUpperCase()}
+                                </div>
+                            )}
+
+                            {/* Info */}
+                            <div className="flex-1 min-w-0">
+                                <div className="flex justify-between items-center mb-1">
+                                    <h4 className={`font-bold truncate ${selectedConvId === conv.id ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                                        {conv.displayName || conv.userEmail.split('@')[0]}
+                                    </h4>
+                                    <span className={`text-[10px] whitespace-nowrap ${selectedConvId === conv.id ? 'text-indigo-200' : 'text-gray-400'}`}>
+                                        {conv.lastMessageTimestamp?.seconds ? new Date(conv.lastMessageTimestamp.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
+                                    </span>
+                                </div>
+                                <p className={`text-sm truncate font-medium flex items-center gap-1 ${selectedConvId === conv.id ? 'text-indigo-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                                    {conv.unreadCount > 0 && selectedConvId !== conv.id && (
+                                        <span className="w-2 h-2 bg-rose-500 rounded-full shrink-0 mr-1 animate-pulse"/>
+                                    )}
+                                    {conv.lastMessage}
+                                </p>
                             </div>
-                            <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2 font-medium">
-                                {msg.message}
-                            </p>
-                            {!msg.read && <div className="mt-2 text-[10px] font-bold text-indigo-500 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse"/> UNREAD</div>}
-                        </motion.div>
+                        </div>
                     ))}
-                    {filteredMessages.length === 0 && <div className="p-10 text-center text-gray-400">No messages found</div>}
+                    {filteredConvs.length === 0 && <div className="text-center py-10 text-gray-400 font-bold text-sm">No conversations found</div>}
                 </div>
             </div>
 
-            {/* Message Detail */}
-            <div className="w-full md:w-2/3 bg-white dark:bg-gray-800 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col relative">
-                {selectedMessage ? (
+            {/* --- CHAT WINDOW (RIGHT) --- */}
+            <div className={`w-full md:w-2/3 bg-white dark:bg-gray-800 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col relative ${!selectedConvId ? 'hidden md:flex' : 'flex'}`}>
+                {selectedConvId ? (
                     <>
-                        <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-start bg-gray-50 dark:bg-gray-800/50">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg">
-                                    {selectedMessage.userEmail[0].toUpperCase()}
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-lg text-gray-900 dark:text-white flex items-center gap-2">
-                                        {selectedMessage.userEmail}
-                                        {selectedMessage.userId !== 'guest' ? <span title="Verified User"><Check size={14} className="text-emerald-500" /></span> : <span className="text-[10px] bg-gray-200 text-gray-600 px-1.5 rounded">GUEST</span>}
-                                    </h3>
-                                    <p className="text-xs text-gray-500 flex items-center gap-2">
-                                        {new Date(selectedMessage.timestamp).toLocaleString()}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-2">
-                                <button onClick={() => handleDeleteClick(selectedMessage.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all" title="Delete">
-                                    <Trash2 size={20} />
+                        {/* Header */}
+                        <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <button className="md:hidden p-2 -ml-2 text-gray-500" onClick={() => setSelectedConvId(null)}>
+                                    <X />
                                 </button>
-                            </div>
-                            </div>
-                        </div>
-                        <div className="flex-1 p-8 overflow-y-auto">
-                            <div className="prose prose-indigo dark:prose-invert max-w-none">
-                                <p className="whitespace-pre-wrap text-lg leading-relaxed text-gray-800 dark:text-gray-200">
-                                    {selectedMessage.message}
-                                </p>
+                                {selectedConversation?.photoURL ? (
+                                    <img src={selectedConversation.photoURL} alt="" className="w-10 h-10 rounded-full object-cover" />
+                                ) : (
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-bold">
+                                        {selectedConversation?.displayName?.[0] || selectedConversation?.userEmail?.[0] || '?'}
+                                    </div>
+                                )}
+                                <div>
+                                    <h3 className="font-bold text-gray-900 dark:text-white leading-none">
+                                        {selectedConversation?.displayName || selectedConversation?.userEmail}
+                                    </h3>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                        {selectedConversation?.userEmail} 
+                                    </span>
+                                </div>
                             </div>
                             
-                            {/* Attachments */}
-                            {selectedMessage.attachments && selectedMessage.attachments.length > 0 && (
-                                <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-700">
-                                    <h4 className="font-bold text-gray-500 uppercase text-xs tracking-wider mb-3 flex items-center gap-2">
-                                        <Paperclip size={14}/> Attachments
-                                    </h4>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        {selectedMessage.attachments.map((att: any, idx: number) => (
-                                            <div key={idx} className="group relative">
-                                                <a 
-                                                    href={att.url} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer"
-                                                    className="block p-3 rounded-xl border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
-                                                >
-                                                    <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
-                                                        <Paperclip size={18}/>
-                                                    </div>
-                                                    <div className="truncate flex-1">
-                                                        <span className="text-sm font-bold text-gray-700 dark:text-gray-200 block truncate">Attachment {idx + 1}</span>
-                                                        <span className="text-xs text-gray-400 uppercase">{att.type || 'FILE'}</span>
-                                                    </div>
-                                                </a>
-                                                <button 
-                                                    onClick={() => handlePromoteClick(att, idx)}
-                                                    className="absolute -top-2 -right-2 bg-emerald-500 text-white p-1.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all hover:scale-110 hover:bg-emerald-600"
-                                                    title="Promote to Resource"
-                                                >
-                                                    <Check size={14} />
-                                                </button>
+                            {/* Email Instead Action */}
+                             <button 
+                                onClick={() => {
+                                    if(selectedConversation) {
+                                        const subject = encodeURIComponent("Follow-up on our chat");
+                                        window.location.href = `mailto:${selectedConversation.userEmail}?subject=${subject}`;
+                                    }
+                                }}
+                                className="px-4 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                            >
+                                Email Instead
+                            </button>
+                        </div>
+
+                        {/* Messages Area */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50 dark:bg-gray-900/50">
+                            {messages.map((msg) => {
+                                const isAdmin = msg.senderId === 'admin';
+                                return (
+                                    <motion.div 
+                                        key={msg.id} 
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className={`flex flex-col ${isAdmin ? 'items-end' : 'items-start'} max-w-[85%] ${isAdmin ? 'ml-auto' : 'mr-auto'}`}
+                                    >
+                                        {/* Reply Context */}
+                                        {msg.replyTo && (
+                                            <div className={`mb-1 px-3 py-1 rounded-lg text-xs opacity-70 border-l-2 ${isAdmin ? 'bg-indigo-100 border-indigo-400 text-indigo-800' : 'bg-gray-200 border-gray-400 text-gray-600'}`}>
+                                               Replying to: {msg.replyTo.text.substring(0, 30)}...
                                             </div>
-                                        ))}
-                                    </div>
+                                        )}
+
+                                        <div className="relative group">
+                                            {/* Message Bubble */}
+                                            <div 
+                                                className={`p-3 rounded-2xl relative ${
+                                                    msg.isDeleted ? 'bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-400 italic' :
+                                                    isAdmin 
+                                                    ? 'bg-indigo-600 text-white rounded-br-sm shadow-lg shadow-indigo-500/20' 
+                                                    : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-bl-sm border border-gray-200 dark:border-gray-700 shadow-sm'
+                                                }`}
+                                            >
+                                                <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.text}</p>
+                                                
+                                                {/* Meta: Time & Status */}
+                                                <div className={`flex items-center gap-1 justify-end mt-1 text-[10px] ${isAdmin ? 'text-indigo-200' : 'text-gray-400'}`}>
+                                                    {msg.timestamp?.seconds ? new Date(msg.timestamp.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '...'}
+                                                    {isAdmin && <StatusIcon status={msg.status} />}
+                                                </div>
+
+                                                {/* Reactions Display */}
+                                                {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                                                    <div className="absolute -bottom-2 right-0 flex bg-white dark:bg-gray-800 rounded-full px-1 shadow border border-gray-100 dark:border-gray-600 text-xs">
+                                                        {Object.entries(msg.reactions).map(([uid, emoji]) => (
+                                                            <span key={uid}>{emoji}</span>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            
+                                            {/* Hover Actions */}
+                                            {!msg.isDeleted && (
+                                                <div className={`absolute top-0 ${isAdmin ? '-left-20' : '-right-20'} opacity-0 group-hover:opacity-100 transition-opacity flex items-center bg-white dark:bg-gray-800 p-1 rounded-full shadow-md border border-gray-100 dark:border-gray-700`}>
+                                                    <button onClick={() => setReplyingTo(msg)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500" title="Reply">
+                                                        <Reply size={14} />
+                                                    </button>
+                                                     {/* Simple Reaction Shortcuts */}
+                                                    <button onClick={() => handleReaction(msg.id, '👍')} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500" title="Like">
+                                                        👍
+                                                    </button>
+                                                    <button onClick={() => setDeleteMsgId(msg.id)} className="p-1.5 hover:bg-red-50 hover:text-red-500 rounded-full text-gray-500" title="Delete">
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                );
+                            })}
+                            <div ref={messagesEndRef} />
+                        </div>
+
+                        {/* Input Area */}
+                        <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 relative z-10">
+                            {replyingTo && (
+                                <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-900 p-2 rounded-lg mb-2 text-xs border-l-4 border-indigo-500">
+                                    <span className="truncate text-gray-500">Replying to: <b>{replyingTo.text}</b></span>
+                                    <button onClick={() => setReplyingTo(null)}><X size={14}/></button>
                                 </div>
                             )}
-                        </div>
-                        <div className="p-6 bg-gray-50 dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700">
-                             <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-                                <h4 className="font-bold text-sm mb-3 flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                                    <Send size={16} className="text-indigo-500"/> Reply to User
-                                </h4>
-                                <textarea 
-                                    className="w-full p-3 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700 min-h-[100px] outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm mb-3 dark:text-white"
-                                    placeholder="Type your reply here..."
-                                    onKeyDown={async (e) => {
-                                        if(e.key === 'Enter' && e.ctrlKey) {
-                                            // Handle send
-                                            const btn = document.getElementById('send-reply-btn');
-                                            btn?.click();
-                                        }
-                                    }}
-                                />
-                                <div className="flex justify-between items-center">
-                                    <p className="text-[10px] text-gray-400">Ctrl + Enter to send</p>
-                                    <div className="flex gap-2">
-                                        <button 
-                                            onClick={() => {
-                                                const btn = document.getElementById('send-reply-btn');
-                                                const textarea = btn?.parentElement?.previousElementSibling as HTMLTextAreaElement;
-                                                const replyText = textarea?.value || '';
 
-                                                const subject = encodeURIComponent("Re: Your inquiry to Obour Institutes");
-                                                const body = encodeURIComponent(replyText); 
-                                                window.open(`mailto:${selectedMessage.userEmail}?subject=${subject}&body=${body}`);
-                                            }}
-                                            className="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center"
-                                        >
-                                            Email Instead
-                                        </button>
-                                        <button 
-                                            id="send-reply-btn"
-                                            onClick={async (e) => {
-                                                const btn = e.currentTarget;
-                                                const textarea = btn.parentElement?.previousElementSibling as HTMLTextAreaElement;
-                                                const text = textarea.value;
-                                                if(!text.trim()) return toast.error("Message empty");
-                                                
-                                                btn.disabled = true;
-                                                const originalText = btn.innerHTML;
-                                                btn.innerHTML = "Sending...";
-                                                
-                                                try {
-                                                    // Use the SAME sendInboxMessage but from system to user
-                                                    // We need a way to push to USER's message stream. 
-                                                    // Assuming DBService.sendInboxMessage sends to global inbox, we might need a specific 'sendToUser'.
-                                                    // For now, let's assume specific logic in DBService or we implement it here.
-                                                    // ACTUALLY: The user's chat history is local or in their own document?
-                                                    // The prompt says "Messages will be sent directly to the institute administration".
-                                                    // If we want to reply to the user's "chat", we need to know where that chat lives.
-                                                    // If the user is just using local storage (as seen in AIChatbot), we CANNOT reply to them in-app unless they are online and we have a socket.
-                                                    // BUT: The user code in AI Chatbot shows: if (chatbotMode === 'admin') await DBService.sendInboxMessage(...)
-                                                    // It seemingly just sends a one-way message.
-                                                    // To reply, we probably need to store messages in a collection `users/{uid}/messages` or similar.
-                                                    // Given current simplified architecture, sending an EMAIL is the only reliable way unless we upgrade the backend.
-                                                    // However, the REQUEST is "add a feature that we can reply live chat not just email".
-                                                    // So I will pretend/implement a `sendUserReply` in DBService that writes to `users/{uid}/notifications` or `messages`.
-                                                    
-                                                    await DBService.replyToUser(selectedMessage.userId, text, selectedMessage.id);
-                                                    
-                                                    toast.success("Reply Sent");
-                                                    textarea.value = '';
-                                                } catch(err) {
-                                                    console.error(err);
-                                                    toast.error("Failed to send");
-                                                } finally {
-                                                    btn.disabled = false;
-                                                    btn.innerHTML = originalText;
-                                                }
-                                            }}
-                                            className="px-6 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/20"
-                                        >
-                                            Send Reply
-                                        </button>
-                                    </div>
+                            <div className="flex items-end gap-2">
+                                <button className="p-3 text-gray-400 hover:text-indigo-600 transition-colors" title="Attach file (Coming Soon)">
+                                    <Paperclip size={20} />
+                                </button>
+                                
+                                <div className="flex-1 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all flex items-center p-1">
+                                    <input 
+                                        value={inputText}
+                                        onChange={(e) => setInputText(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                handleSendMessage();
+                                            }
+                                        }}
+                                        placeholder="Type a message..."
+                                        className="w-full bg-transparent border-none focus:ring-0 p-3 max-h-32 min-h-[48px] text-sm text-gray-900 dark:text-white font-medium placeholder:text-gray-400 resize-none"
+                                    />
+                                    <button 
+                                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                        className="p-2 text-gray-400 hover:text-amber-500 transition-colors mr-1"
+                                    >
+                                        <Smile size={20}/>
+                                    </button>
                                 </div>
-                             </div>
+
+                                <motion.button 
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={handleSendMessage}
+                                    disabled={!inputText.trim()}
+                                    className="p-4 bg-indigo-600 text-white rounded-2xl shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 disabled:opacity-50 disabled:shadow-none transition-all flex items-center justify-center transform hover:-translate-y-1"
+                                >
+                                    <Send size={20} className={inputText.trim() ? 'ml-0.5' : ''} />
+                                </motion.button>
+                            </div>
+
+                             {/* Simple Emoji Picker Popover */}
+                             <AnimatePresence>
+                                {showEmojiPicker && (
+                                    <motion.div 
+                                        initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                                        className="absolute bottom-20 right-20 bg-white dark:bg-gray-800 p-3 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 grid grid-cols-4 gap-2"
+                                    >
+                                        {EMOJIS.map(emoji => (
+                                            <button 
+                                                key={emoji} 
+                                                onClick={() => { setInputText(prev => prev + emoji); setShowEmojiPicker(false); }}
+                                                className="text-2xl hover:bg-gray-100 dark:hover:bg-gray-700 p-2 rounded-xl"
+                                            >
+                                                {emoji}
+                                            </button>
+                                        ))}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
                     </>
                 ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
-                        <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-                            <MessageCircle size={32} className="opacity-50"/>
+                    <div className="flex-1 flex flex-col items-center justify-center text-gray-400 bg-gray-50/30 dark:bg-gray-900/10">
+                        <div className="w-24 h-24 bg-indigo-50 dark:bg-indigo-900/20 rounded-full flex items-center justify-center mb-6 animate-pulse">
+                            <MessageCircle size={40} className="text-indigo-200 dark:text-indigo-800"/>
                         </div>
-                        <p className="font-bold">Select a message to view details</p>
+                        <h3 className="text-xl font-black text-gray-300 dark:text-gray-600 mb-2">Admin Chat Hub</h3>
+                        <p className="text-sm font-bold text-gray-300 dark:text-gray-600">Select a conversation to start chatting</p>
                     </div>
                 )}
             </div>

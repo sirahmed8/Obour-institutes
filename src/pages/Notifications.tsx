@@ -7,6 +7,7 @@ import { DBService } from '../services/storage';
 import { query, collection, orderBy, getDocs, limit, deleteDoc, doc, writeBatch } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { toast } from 'react-hot-toast';
+import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 
 export const NotificationsPage: React.FC = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -45,8 +46,10 @@ export const NotificationsPage: React.FC = () => {
       }
   };
 
+  const [showClearModal, setShowClearModal] = useState(false);
+  
   const handleClearAll = async () => {
-      if (!window.confirm("Clear all notifications?")) return;
+      // Logic moved to onConfirm of modal
       try {
           const batch = writeBatch(db);
           notifications.forEach(n => {
@@ -58,6 +61,7 @@ export const NotificationsPage: React.FC = () => {
       } catch (e) {
           toast.error("Failed to clear");
       }
+      setShowClearModal(false);
   };
 
   return (
@@ -73,11 +77,20 @@ export const NotificationsPage: React.FC = () => {
                 </div>
             </div>
             {notifications.length > 0 && (
-                <button onClick={handleClearAll} className="text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 px-4 py-2 rounded-lg transition-colors">
+                <button onClick={() => setShowClearModal(true)} className="text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 px-4 py-2 rounded-lg transition-colors">
                     Clear All
                 </button>
             )}
         </div>
+        
+        <ConfirmationModal
+            isOpen={showClearModal}
+            onClose={() => setShowClearModal(false)}
+            onConfirm={handleClearAll}
+            title="Clear All Notifications?"
+            message="This will permanently delete all your notifications. This action cannot be undone."
+            isDeleting={false}
+        />
 
         {loading ? (
             <div className="space-y-4">

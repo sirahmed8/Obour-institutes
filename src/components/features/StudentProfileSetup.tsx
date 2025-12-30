@@ -49,14 +49,14 @@ export const StudentProfileSetup: React.FC = () => {
         checkProfile();
     }, [currentUser]);
 
-    const validateName = (val: string) => /^[a-zA-Z\s\u0600-\u06FF]+$/.test(val); // Letters and spaces (Ar/En)
+    const validateName = (val: string) => /^[\u0600-\u06FF\s]+$/.test(val); // Arabic Only
     const validateCode = (val: string) => /^\d{6}$/.test(val); // Exactly 6 digits
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
         if (!validateName(name)) {
-            toast.error("Name must contain letters only.");
+            toast.error("الاسم يجب أن يكون باللغة العربية فقط");
             return;
         }
         if (!validateCode(code)) {
@@ -118,7 +118,7 @@ export const StudentProfileSetup: React.FC = () => {
                     <form onSubmit={handleSubmit} className="p-8 space-y-6">
                         {/* Name Input */}
                         <div className="space-y-2">
-                             <label className="text-xs font-bold uppercase text-gray-400 tracking-wider ml-1">Full Name (Letters Only)</label>
+                             <label className="text-xs font-bold uppercase text-gray-400 tracking-wider ml-1">Full Name (Arabic Only / الاسم ثلاثي بالعربي)</label>
                              <div className="relative">
                                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                                  <input 
