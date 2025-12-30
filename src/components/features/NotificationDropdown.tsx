@@ -60,7 +60,7 @@ export const NotificationDropdown: React.FC = () => {
                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="absolute right-0 mt-3 w-80 bg-white/90 dark:bg-slate-900/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-100 dark:border-white/10 overflow-hidden z-50 origin-top-right ring-1 ring-black ring-opacity-5"
+                        className="absolute right-0 mt-3 w-80 bg-white dark:bg-gray-900 shadow-2xl rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50 origin-top-right ring-1 ring-black ring-opacity-5"
                     >
                         {/* Header */}
                         <div className="p-4 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-gray-50/50 dark:bg-slate-900/50">

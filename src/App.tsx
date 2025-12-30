@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState, lazy, Suspense } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect, useState, lazy, Suspense } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Bell, X, Lock } from 'lucide-react';
 import { HelmetProvider } from 'react-helmet-async';
@@ -106,7 +107,7 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <Router>
+    <>
       <Layout>
         <ToastSetup /> 
         <Suspense fallback={<LoadingScreen />}>
@@ -144,7 +145,7 @@ const AppContent: React.FC = () => {
           )}
         </AnimatePresence>
       </Layout>
-    </Router>
+    </>
   );
 };
 

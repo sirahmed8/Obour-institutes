@@ -183,13 +183,9 @@ export const Navbar: React.FC = () => {
                               <button 
                                 onClick={() => {
                                   if (Notification.permission === 'granted') {
-                                      toast.success("Notifications already active");
-                                  } else if (Notification.permission === 'denied') {
-                                      toast.error("Notifications blocked in browser settings");
+                                     toast("To disable notifications, please change your browser settings.", { icon: 'ℹ️' });
                                   } else {
-                                      Notification.requestPermission().then(p => {
-                                          if(p === 'granted') toast.success("Notifications Enabled");
-                                      });
+                                     Notification.requestPermission();
                                   }
                                 }}
                                 className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all group"

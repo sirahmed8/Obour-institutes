@@ -284,7 +284,7 @@ export const AIChatbot: React.FC = () => {
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0, opacity: 0, y: 50 }}
             onClick={() => setIsOpen(true)}
-            className="fixed bottom-6 right-6 z-[9999] pointer-events-auto p-4 bg-gradient-to-tr from-indigo-600 to-purple-600 text-white rounded-full shadow-[0_10px_30px_-10px_rgba(79,70,229,0.6)] flex items-center justify-center transition-shadow animate-breath hover:shadow-indigo-500/80 hover:ring-4 hover:ring-indigo-300 dark:hover:ring-indigo-900 mb-24 md:mb-0"
+            className="fixed bottom-6 right-6 z-[9999] pointer-events-auto p-4 bg-gradient-to-tr from-indigo-600 to-purple-600 text-white rounded-full shadow-[0_10px_30px_-10px_rgba(79,70,229,0.6)] flex items-center justify-center transition-shadow animate-breath hover:shadow-indigo-500/80 hover:ring-4 hover:ring-indigo-300 dark:hover:ring-indigo-900 mb-16 md:mb-0"
           >
             <Bot size={32} />
           </motion.button>
