@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Shield, UserPlus, AlertCircle, Bell, Layers, BookOpen } from 'lucide-react';
+import { User, Shield, UserPlus, AlertCircle, Bell, Layers, BookOpen, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { DBService } from '../../../services/storage';
