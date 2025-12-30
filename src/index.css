@@ -14,10 +14,11 @@ body {
 
 /* --- THE "WHITE FLASH" FIX --- */
 /* --- THE "WHITE FLASH" FIX --- */
+/* --- THE "WHITE FLASH" FIX --- */
+/* --- THE "WHITE FLASH" FIX --- */
 *:focus-visible {
   outline: none;
-  ring: 2px solid #6366f1;
-  ring-offset: 2px;
+  box-shadow: 0 0 0 2px #6366f1;
 }
 
 .focus-ring {

@@ -32,7 +32,7 @@ export const CookieConsent: React.FC = () => {
                     initial={{ y: 100, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: 100, opacity: 0 }}
-                    className="fixed bottom-20 md:bottom-0 left-0 right-0 p-4 z-50 flex justify-center pointer-events-none"
+                    className="fixed bottom-24 md:bottom-0 left-0 right-0 p-4 z-50 flex justify-center pointer-events-none"
                     >
                     <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-md border border-gray-200 dark:border-gray-700 shadow-[0_8px_30px_rgb(0,0,0,0.12)] p-6 rounded-3xl max-w-2xl w-full pointer-events-auto flex flex-col md:flex-row gap-6 items-center">
                         <div className="p-3 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 rounded-2xl shrink-0">

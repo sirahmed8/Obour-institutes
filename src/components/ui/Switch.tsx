@@ -15,13 +15,13 @@ export const Switch: React.FC<SwitchProps> = ({ checked, onChange, disabled }) =
       aria-checked={checked}
       onClick={() => !disabled && onChange(!checked)}
       disabled={disabled}
-      className={`
-        relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent 
-        transition-colors duration-200 ease-in-out 
-        ${checked ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-slate-700'}
-        ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
-        focus:outline-none focus:ring-0 /* Focus ring handled globally via CSS */
-      `}
+        className={`
+          relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent 
+          transition-colors duration-200 ease-in-out 
+          ${checked ? 'bg-indigo-600' : 'bg-slate-700 dark:bg-slate-700'}
+          ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
+          focus:outline-none focus:ring-0
+        `}
     >
       <span className="sr-only">Toggle</span>
       <motion.span
@@ -30,7 +30,7 @@ export const Switch: React.FC<SwitchProps> = ({ checked, onChange, disabled }) =
         initial={false}
         animate={{ x: checked ? 20 : 0 }}
         className={`
-          pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 
+          pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 
           transition duration-200 ease-in-out
         `}
       />

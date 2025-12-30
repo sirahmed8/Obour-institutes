@@ -443,19 +443,28 @@ export const DBService = {
   },
 
   replyToUser: async (userId: string, message: string, originalMessageId?: string) => {
-      // Create a notification for the user
+      // 1. Send to User's private message collection
+      const userMsgRef = collection(db, 'users', userId, 'messages');
+      await addDoc(userMsgRef, {
+          role: 'model', // So it appears as AI/Admin response
+          text: message,
+          timestamp: new Date().toISOString(),
+          isSupportReply: true
+      });
+
+      // 2. Create notification (optional, but good for visibility)
       await addDoc(collection(db, 'notifications'), {
           title: 'Admin Reply',
           body: message,
-          link: '/#chatbot', // Direct them to chatbot
+          link: '/#chatbot',
           type: 'message',
-          recipientId: userId, // Targeted notification
+          recipientId: userId,
           relatedMessageId: originalMessageId,
           createdAt: new Date().toISOString(),
           read: false
       });
 
-      // Also mark original message as replied (optional but good for UI)
+      // 3. Mark original as replied
       if (originalMessageId) {
           try {
               await updateDoc(doc(db, 'inbox', originalMessageId), { replied: true });

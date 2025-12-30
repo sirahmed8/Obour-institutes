@@ -8,6 +8,8 @@ import Markdown from 'react-markdown';
 import { useAuth } from '../../context/AuthContext';
 import { generateAIResponse, AIModel } from '../../services/aiService';
 import { ConfirmationModal } from '../ui/ConfirmationModal';
+import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore'; 
+import { db } from '../../services/firebase';
 
 interface Message {
   role: 'user' | 'model';
@@ -19,7 +21,7 @@ export const AIChatbot: React.FC = () => {
   
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'model', text: "Hello! 👋 I'm **Obour AI**. \n\nI can help you find courses, summarize notes, or answer questions about the institute. \n\n*Switch to 'Online Mode' for AI-powered answers!*" }
+    { role: 'model', text: "أهلاً بك في مساعد معهد العبور الذكي 👋 \n\nيمكنني مساعدتك في العثور على الدورات، وتلخيص الملاحظات، أو الإجابة على أسئلة حول المعهد. \n\n*قم بالتبديل إلى 'Online Mode' للحصول على إجابات مدعومة بالذكاء الاصطناعي!*" }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -74,6 +76,51 @@ export const AIChatbot: React.FC = () => {
         } catch (e) { console.error("History load failed", e); }
     }
   }, []);
+
+  useEffect(() => {
+      if (!currentUser) return;
+      
+      // Listen for Admin Replies (Support Mode)
+      // Even if not in admin mode, we might want to see notifications or switch mode?
+      // For now, let's append them if they arrive.
+      const q = query(
+          collection(db, 'users', currentUser.uid, 'messages'),
+          orderBy('timestamp', 'asc'),
+          limit(50)
+      );
+
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+          const newMsgs = snapshot.docs.map(d => d.data());
+          // Merge with local messages? 
+          // Actually, if we are using this logic, we should probably sync ALL messages with Firestore if in Admin Mode.
+          // But to avoid rewriting the entire local-storage logic which users like for offline privacy:
+          // We will just append NEW admin messages that we haven't seen.
+          // Or, simple Hack: If we receive a message from 'model' that isSupportReply, show it.
+          
+          // Better: If in Admin Mode, show Firestore messages primarily?
+          // The user wants "Admin <-> User Chat Logic" fixed.
+          
+          snapshot.docChanges().forEach((change) => {
+              if (change.type === 'added') {
+                  const data = change.doc.data();
+                  // Avoid duplicating our own messages if we synced them (we currently don't sync user messages to this collection, only inbox)
+                  // The Admin writes to this collection.
+                  if (data.isSupportReply) {
+                      setMessages(prev => {
+                          // Dedup check
+                          if (prev.some(m => m.text === data.text)) return prev;
+                          return [...prev, { role: 'model', text: `📩 **Support Team:**\n\n${data.text}` }];
+                      });
+                      // If not in admin mode, maybe alert?
+                      if (chatbotMode !== 'admin') {
+                           toast("New Support Message Received", { icon: '💬' });
+                      }
+                  }
+              }
+          });
+      });
+      return () => unsubscribe();
+  }, [currentUser, chatbotMode]);
 
   useEffect(() => {
     if (messages.length > 0) { 
@@ -236,7 +283,7 @@ export const AIChatbot: React.FC = () => {
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0, opacity: 0, y: 50 }}
             onClick={() => setIsOpen(true)}
-            className="fixed bottom-6 right-6 z-50 pointer-events-auto p-4 bg-gradient-to-tr from-indigo-600 to-purple-600 text-white rounded-full shadow-[0_10px_30px_-10px_rgba(79,70,229,0.6)] flex items-center justify-center transition-shadow animate-breath hover:shadow-indigo-500/80 hover:ring-4 hover:ring-indigo-300 dark:hover:ring-indigo-900 mb-16 md:mb-0"
+            className="fixed bottom-6 right-6 z-[9999] pointer-events-auto p-4 bg-gradient-to-tr from-indigo-600 to-purple-600 text-white rounded-full shadow-[0_10px_30px_-10px_rgba(79,70,229,0.6)] flex items-center justify-center transition-shadow animate-breath hover:shadow-indigo-500/80 hover:ring-4 hover:ring-indigo-300 dark:hover:ring-indigo-900 mb-24 md:mb-0"
           >
             <Bot size={32} />
           </motion.button>
@@ -257,9 +304,9 @@ export const AIChatbot: React.FC = () => {
             exit={{ opacity: 0, scale: 0.9, y: 20, transition: { duration: 0.2 } }}
             transition={{ type: "spring", stiffness: 350, damping: 30 }}
             style={{ 
-              height: isMobile ? '60vh' : '650px',
+              height: isMobile ? '85dvh' : '650px',
               position: 'fixed',
-              bottom: isMobile ? '6rem' : '1.5rem', 
+              bottom: isMobile ? '0' : '1.5rem', 
               right: isMobile ? '0' : '1.5rem',
               top: 'auto',
               width: isMobile ? '100%' : '420px',
@@ -427,7 +474,7 @@ export const AIChatbot: React.FC = () => {
                 {/* Input Field */}
                 <motion.div 
                   layout
-                  className="p-3 md:p-4 flex gap-3 items-end"
+                  className="p-3 md:p-4 flex gap-3 items-end sticky bottom-0 pb-safe"
                 >
                   <input 
                       type="file" 

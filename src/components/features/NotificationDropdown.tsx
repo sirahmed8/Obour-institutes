@@ -118,7 +118,7 @@ export const NotificationDropdown: React.FC = () => {
                             <Link 
                                 to="/notifications" 
                                 onClick={() => setIsOpen(false)} 
-                                className="w-full block text-center py-2 rounded-lg text-xs font-bold text-gray-500 hover:text-indigo-600 hover:bg-white dark:hover:bg-slate-800 transition-all"
+                                className="block w-full text-center py-3 text-xs font-bold text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors uppercase tracking-wider"
                             >
                                 View All History
                             </Link>
