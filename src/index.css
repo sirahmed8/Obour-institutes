@@ -13,22 +13,6 @@ body {
 }
 
 /* --- THE "WHITE FLASH" FIX --- */
-/* --- THE "WHITE FLASH" FIX --- */
-/* --- THE "WHITE FLASH" FIX --- */
-/* --- THE "WHITE FLASH" FIX --- */
-*:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px #6366f1;
-}
-
-.focus-ring {
-  @apply ring-2 ring-indigo-500/50 ring-offset-2 dark:ring-offset-gray-900 transition-all duration-300;
-}
-
-*:focus {
-  outline: none !important;
-}
-
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -39,36 +23,30 @@ body {
   *:focus {
     outline: none !important;
   }
-
-  /* Optional: Standardize focus ring if desired, but User specifically asked to remove 'White Flash' */
+  
   input:focus,
   textarea:focus,
   select:focus {
     outline: none !important;
-    box-shadow: none !important; /* Or strictly control it */
+    box-shadow: none !important; 
   }
 
   html {
-    font-size: 16px; /* Base size legibility */
+    font-size: 16px; 
   }
 
   button,
   a {
     @apply cursor-pointer select-none active:scale-95 transition-transform;
     min-width: 44px;
-    min-height: 44px; /* Accessible touch targets */
+    min-height: 44px;
   }
 
   svg {
     @apply shrink-0;
   }
-
-  input:focus,
-  select:focus,
-  textarea:focus {
-    @apply ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-gray-900 transition-shadow outline-none;
-  }
 }
+
 
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;

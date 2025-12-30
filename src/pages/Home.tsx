@@ -1,13 +1,14 @@
-
+```
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Library, Search, BookOpen, GraduationCap, Sparkles, ChevronDown } from 'lucide-react';
+import { ArrowRight, Library, Search, BookOpen, GraduationCap, Sparkles, ChevronDown, User, ArrowDownUp, Clock, Check } from 'lucide-react';
 import { DBService } from '../services/storage';
 import { useAuth } from '../context/AuthContext';
-import { Subject, ICON_MAP } from '../types';
+import { Subject, ICON_MAP, SortOption } from '../types';
 import { useLanguage } from '../context/LanguageContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Banner } from '../components/features/Banner';
+import { CustomSelect } from '../components/ui/CustomSelect';
 
 const SubjectCard: React.FC<{ subject: Subject }> = ({ subject }) => {
   const IconComponent = ICON_MAP[subject.icon] || Library;
@@ -168,9 +169,7 @@ export const Home: React.FC = () => {
               </div>
               
               {/* Sort Dropdown */}
-              <div className="relative shrink-0" ref={sortRef}>
-                  <button
-              <div className="md:w-64 z-20"> 
+              <div className="md:w-64 z-20 shrink-0"> 
                <CustomSelect
                   value={sortOption}
                   onChange={(val) => setSortOption(val as SortOption)}
