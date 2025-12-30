@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense } from 'react';
-import { BookOpen, Layers, Shield, Settings, Activity, Users, UserPlus, Trash2, RefreshCcw, Bell, AlertTriangle, AlertCircle } from 'lucide-react';
+import { BookOpen, Layers, Shield, Settings, Activity, Users, User, UserPlus, Trash2, RefreshCcw, Bell, AlertTriangle, AlertCircle, AlertOctagon } from 'lucide-react';
 import { DBService } from '../services/storage';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -7,20 +7,25 @@ import { Subject, Log, SystemSettings, AdminProfile, UserRole } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 
+import { LoadingFallback } from '../components/ui/LoadingFallback';
+import { CustomSelect } from '../components/ui/CustomSelect'; 
+import { Switch } from '../components/ui/Switch';
+import { ConfirmationModal } from '../components/ui/ConfirmationModal';
+
 // Modular Components
 import { SubjectManager } from '../components/features/admin/SubjectManager';
 import { ResourceForm } from '../components/features/admin/ResourceForm';
 import { SystemLogs } from '../components/features/admin/SystemLogs';
 import { GlobalSettings } from '../components/features/GlobalSettings';
+import { ErrorReporting } from '../components/features/admin/ErrorReporting';
+import { Inbox } from '../components/features/admin/Inbox';
+import { MessageCircle } from 'lucide-react';
+
 
 // Lazy Load Analytics
 const AnalyticsDashboard = React.lazy(() => import('../components/features/admin/AnalyticsDashboard'));
 
-const LoadingFallback = () => (
-  <div className="flex justify-center items-center h-64">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-  </div>
-);
+
 
 export const Admin: React.FC = () => {
   const { currentUser, isAdmin, role, canEdit, canDelete } = useAuth();
@@ -32,16 +37,24 @@ export const Admin: React.FC = () => {
   const [admins, setAdmins] = useState<AdminProfile[]>([]);
   
   const [activeTab, setActiveTab] = useState('analytics');
-  const [isResettingAnalytics, setIsResettingAnalytics] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [newAdminRole, setNewAdminRole] = useState<UserRole>('viewer');
+  const [newPermissions, setNewPermissions] = useState<any>({
+      canCreateBanner: false,
+      canSendEmails: false,
+      canSendNotifications: false,
+      canUploadResources: false,
+      canEditSubjects: false
+  });
+
+  const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, email: string | null}>({isOpen: false, email: null});
 
   useEffect(() => {
     // Only fetch if we are legitimately an admin
     if (isAdmin) {
-       refreshData();
+       refreshData(true); // Silent refresh on mount
     } else {
        // If not admin, we redirect anyway, so no op
        const t = setTimeout(() => {
@@ -51,33 +64,27 @@ export const Admin: React.FC = () => {
     }
   }, [isAdmin, navigate]);
 
-  const refreshData = async () => {
+  const refreshData = async (silent = false) => {
     setLoadingData(true);
     try {
-        // Run requests in parallel but simpler catch blocks
-        const subs = await DBService.getSubjects().catch(err => {
-             console.error("Failed to fetch subjects:", err);
-             return []; 
-        });
+        // Parallel fetch for speed
+        const [subs, anaLogs, sysSettings, adminList] = await Promise.all([
+            DBService.getSubjects().catch(() => []),
+            DBService.getAnalyticsLogs().catch(() => []),
+            DBService.getSettings().catch(() => ({ announcement: '', showAnnouncement: false })),
+            DBService.getAdmins().catch(() => [])
+        ]);
         
-        const anaLogs = await DBService.getAnalyticsLogs().catch(err => {
-            console.warn("Analytics logs fetch restricted or failed:", err);
-            return [];
-        });
-
-        const sysSettings = await DBService.getSettings().catch(() => ({ announcement: '', showAnnouncement: false }));
-        
-        // Only fetch admins if super_admin or we handle the error gracefully
-        const adminList = await DBService.getAdmins().catch(() => []); // Might fail if not allowed
+        // Sorting is now enforced by the API (orderBy name asc)
         
         setSubjects(subs || []); 
         setAnalyticsLogs(anaLogs || []);
-        setSettings(sysSettings);
+        setSettings(sysSettings as any);
         setAdmins(adminList || []);
-        toast.success("Dashboard Updated");
+        if (!silent) toast.success("Dashboard Updated");
     } catch(e) { 
         console.error("Admin Critical Data Load Error:", e);
-        toast.error("Some data failed to load. Check console.");
+        toast.error("Partial data load failure");
     } finally {
         setLoadingData(false);
     }
@@ -87,21 +94,33 @@ export const Admin: React.FC = () => {
       e.preventDefault();
       if (!canDelete) return toast.error("Permission Denied: Owner only");
       try {
-          await DBService.addAdmin(newAdminEmail, newAdminRole);
+          const perms = newAdminRole === 'admin' ? newPermissions : undefined;
+          await DBService.addAdmin(newAdminEmail, newAdminRole, perms);
           setNewAdminEmail('');
-          refreshData();
-          toast.success("Admin Added");
+          setNewPermissions({
+            canCreateBanner: false,
+            canSendEmails: false,
+            canSendNotifications: false,
+            canUploadResources: false,
+            canEditSubjects: false
+          });
+          refreshData(); // Triggers re-fetch
+          toast.success("Member Added");
       } catch (e) { toast.error("Failed to add member"); }
   };
 
   const handleRemoveAdmin = async (email: string) => {
       if (!canDelete) return toast.error("Permission Denied");
       if (email === currentUser?.email) return toast.error("Cannot remove yourself");
-      if (confirm(`Remove ${email}?`)) {
-          await DBService.removeAdmin(email);
-          refreshData();
-          toast.success("Member Removed");
-      }
+      setConfirmModal({ isOpen: true, email });
+  };
+  
+  const proceedRemoveAdmin = async () => {
+      if (!confirmModal.email) return;
+      await DBService.removeAdmin(confirmModal.email);
+      refreshData();
+      toast.success("Member Removed");
+      setConfirmModal({ isOpen: false, email: null });
   };
 
   return (
@@ -122,7 +141,7 @@ export const Admin: React.FC = () => {
         </div>
         <div className="flex gap-3">
             <button 
-                onClick={refreshData} 
+                onClick={() => refreshData(false)} 
                 disabled={loadingData}
                 className="bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 p-3 rounded-2xl shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-100 dark:border-gray-700 transition-all active:scale-95 disabled:opacity-50"
             >
@@ -139,9 +158,11 @@ export const Admin: React.FC = () => {
         <div className="lg:col-span-3 space-y-2">
             {[ 
                 {id: 'analytics', label: 'Analytics', icon: Activity},
+                {id: 'inbox', label: 'Inbox', icon: MessageCircle}, // NEW INBOX TAB
                 {id: 'resource', label: 'Add Resource', icon: Layers}, 
                 {id: 'subject', label: 'Curriculum', icon: BookOpen}, 
                 {id: 'team', label: 'Team & Roles', icon: Users},
+                {id: 'errors', label: 'Error Reports', icon: AlertOctagon}, // NEW TAB
                 {id: 'logs', label: 'System Logs', icon: AlertTriangle},
                 {id: 'settings', label: 'Global Settings', icon: Settings},
             ].map(t => (
@@ -150,7 +171,7 @@ export const Admin: React.FC = () => {
                   whileHover={{ scale: 1.02, x: 4 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => setActiveTab(t.id)} 
-                  className={`w-full flex items-center px-5 py-4 rounded-2xl transition-all font-bold text-left ${
+                  className={`w-full flex items-center px-5 py-4 rounded-2xl transition-all font-bold text-left focus:outline-none ${
                     activeTab === t.id 
                     ? 'bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 shadow-xl border border-indigo-50 dark:border-gray-700' 
                     : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-800 hover:text-indigo-600'
@@ -177,6 +198,8 @@ export const Admin: React.FC = () => {
                   </Suspense>
                 )}
 
+                {activeTab === 'inbox' && <Inbox subjects={subjects || []} />}
+
                 {activeTab === 'resource' && (
                    canEdit ? <ResourceForm subjects={subjects || []} onSuccess={refreshData} /> : <div className="p-8 text-center text-red-500 bg-red-50 rounded-xl border border-red-100">Restricted Tab.</div>
                 )}
@@ -189,59 +212,157 @@ export const Admin: React.FC = () => {
                   <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
                       <h3 className="text-xl font-bold mb-8 flex items-center dark:text-white"><Users className="mr-3 text-indigo-500" /> Manage Team</h3>
                       {canDelete && (
-                          <form onSubmit={handleAddAdmin} className="mb-8 p-6 bg-gray-50 dark:bg-gray-700/30 rounded-2xl border border-gray-100 dark:border-gray-700">
-                             <h4 className="font-bold mb-4 text-sm uppercase tracking-wide text-gray-500">Add New Member</h4>
-                             <div className="flex flex-col sm:flex-row gap-4">
-                                <input 
-                                  type="email" 
-                                  placeholder="Email Address" 
-                                  value={newAdminEmail}
-                                  onChange={e => setNewAdminEmail(e.target.value)}
-                                  className="flex-1 p-3 rounded-xl border border-gray-200 dark:bg-gray-800 dark:border-gray-600 dark:text-white bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                                  required
-                                />
-                                <select 
-                                  value={newAdminRole}
-                                  onChange={e => setNewAdminRole(e.target.value as UserRole)}
-                                  className="p-3 rounded-xl border border-gray-200 dark:bg-gray-800 dark:border-gray-600 dark:text-white bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                                >
-                                    <option value="viewer" className="dark:bg-gray-800">Viewer</option>
-                                    <option value="editor" className="dark:bg-gray-800">Editor</option>
-                                    <option value="super_admin" className="dark:bg-gray-800">Owner</option>
-                                </select>
-                                <button className="bg-indigo-600 text-white px-6 py-3 rounded-xl hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-500/30 transition-all active:scale-95 flex items-center justify-center">
-                                    <UserPlus size={20} />
-                                </button>
-                             </div>
-                          </form>
+                          <div className="mb-8 p-6 bg-gray-50 dark:bg-gray-700/30 rounded-2xl border border-gray-100 dark:border-gray-700 transition-all">
+                              <form onSubmit={handleAddAdmin} className="space-y-4">
+                                <h4 className="font-bold text-sm uppercase tracking-wide text-gray-500 flex items-center gap-2">
+                                    <UserPlus size={16}/> Add New Member
+                                </h4>
+                                <div className="flex flex-col md:flex-row gap-4 items-start">
+                                    <div className="flex-1 w-full">
+                                        <input 
+                                          type="email" 
+                                          placeholder="Email Address" 
+                                          value={newAdminEmail}
+                                          onChange={e => setNewAdminEmail(e.target.value)}
+                                          className="w-full p-3.5 rounded-2xl border border-gray-200 dark:bg-gray-800 dark:border-gray-600 dark:text-white bg-white focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all"
+                                          required
+                                        />
+                                    </div>
+                                    <div className="w-full md:w-64 relative z-20">
+                                        <CustomSelect 
+                                            value={newAdminRole}
+                                            onChange={(v) => setNewAdminRole(v as UserRole)}
+                                            options={[
+                                                { value: 'viewer', label: 'Member', icon: <User size={16}/> },
+                                                { value: 'admin', label: 'Admin', icon: <Shield size={16}/> }
+                                            ]}
+                                            placeholder="Select Role"
+                                        />
+                                    </div>
+                                    <button className="w-full md:w-auto bg-indigo-600 text-white px-8 py-3.5 rounded-2xl hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-500/30 transition-all active:scale-95 flex items-center justify-center shrink-0">
+                                        Add Member
+                                    </button>
+                                </div>
+
+                                {/* Permissions Toggles - Available for both Member and Admin roles */}
+                                <AnimatePresence>
+                                    <motion.div 
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: 'auto', opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        className="overflow-hidden pt-2"
+                                    >
+                                        <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-200 dark:border-gray-600 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div className="col-span-full flex items-center justify-between mb-2">
+                                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                                                    {newAdminRole === 'admin' ? 'Admin Capabilities' : 'Member Capabilities'}
+                                                </p>
+                                                {newAdminRole === 'viewer' && (
+                                                    <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-500 px-2 py-1 rounded-md">
+                                                        Granting permissions makes this member a limited admin.
+                                                    </span>
+                                                )}
+                                            </div>
+                                            
+                                            {[
+                                                { key: 'canCreateBanner', label: 'Create Banners', icon: AlertCircle },
+                                                { key: 'canSendEmails', label: 'Send Emails', icon: Users },
+                                                { key: 'canSendNotifications', label: 'Push Notifications', icon: Bell },
+                                                { key: 'canUploadResources', label: 'Upload Resources', icon: Layers },
+                                                { key: 'canEditSubjects', label: 'Edit Subjects', icon: BookOpen },
+                                            ].map((perm) => (
+                                                <div key={perm.key} className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 border border-transparent hover:border-gray-100 dark:hover:border-gray-600 transition-all gap-4">
+                                                    <div className="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200">
+                                                        <div className={`p-2 rounded-lg ${
+                                                            (newPermissions as any)[perm.key] 
+                                                            ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 api-active' 
+                                                            : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                                                        }`}>
+                                                            <perm.icon size={16} />
+                                                        </div>
+                                                        {perm.label}
+                                                    </div>
+                                                    <Switch 
+                                                        checked={(newPermissions as any)[perm.key]}
+                                                        onChange={(checked) => setNewPermissions({...newPermissions, [perm.key]: checked})}
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </motion.div>
+                                </AnimatePresence>
+                             </form>
+                          </div>
                       )}
                       <div className="space-y-3">
                           {admins.map(admin => (
-                              <div key={admin.email} className="flex justify-between items-center p-4 bg-white dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-xl hover:shadow-md transition-shadow">
-                                  <div className="flex items-center gap-4">
-                                      <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-white ${admin.role === 'super_admin' ? 'bg-purple-500' : 'bg-indigo-500'}`}>
+                              <div key={admin.email} className="flex flex-col sm:flex-row sm:items-center justify-between p-6 bg-white dark:bg-gray-700/50 border border-gray-100 dark:border-gray-600 rounded-[1.5rem] hover:shadow-lg hover:border-indigo-100 dark:hover:border-gray-500 transition-all gap-6 group">
+                                  <div className="flex items-center gap-5">
+                                      <div className={`h-14 w-14 rounded-2xl flex items-center justify-center font-black text-xl text-white shadow-lg shadow-indigo-500/20 transform group-hover:scale-110 transition-transform ${
+                                          admin.role === 'super_admin' ? 'bg-gradient-to-br from-purple-500 to-indigo-600' : 
+                                          admin.role === 'admin' ? 'bg-gradient-to-br from-indigo-500 to-blue-600' : 'bg-gray-400'
+                                      }`}>
                                           {admin.email[0].toUpperCase()}
                                       </div>
                                       <div>
-                                          <p className="font-bold dark:text-white">{admin.email}</p>
-                                          <span className="text-xs uppercase tracking-widest text-indigo-500 font-black">{admin.role.replace('_', ' ')}</span>
+                                          <p className="font-bold dark:text-white text-lg flex items-center gap-2">
+                                            {admin.email.split('@')[0]}
+                                            {admin.email === currentUser?.email && <span className="text-[10px] bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full uppercase tracking-wider">You</span>}
+                                          </p>
+                                          <p className="text-xs text-gray-500 dark:text-gray-400 font-mono tracking-wide">{admin.email}</p>
+                                          <div className="flex gap-2 mt-2">
+                                            <span className={`text-[10px] uppercase tracking-widest font-black px-3 py-1 rounded-lg ${
+                                                admin.role === 'super_admin' ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-300' : 
+                                                admin.role === 'admin' ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-600 dark:text-gray-300'
+                                            }`}>
+                                                {admin.role === 'super_admin' ? 'Owner' : admin.role === 'admin' ? 'Admin' : 'Member'}
+                                            </span>
+                                          </div>
                                       </div>
                                   </div>
-                                  {canDelete && admin.email !== currentUser?.email && (
-                                      <button onClick={() => handleRemoveAdmin(admin.email)} className="text-gray-400 hover:text-red-500 p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"><Trash2 size={18}/></button>
-                                  )}
+                                  
+                                  <div className="flex items-center gap-3 self-end sm:self-auto">
+                                      {/* Show permissions summary for admins */}
+                                      {admin.role === 'admin' && admin.permissions && (
+                                          <div className="hidden md:flex gap-1 bg-gray-50 dark:bg-gray-800 p-2 rounded-xl border border-gray-100 dark:border-gray-600">
+                                              {admin.permissions.canCreateBanner && <div title="Banners" className="p-1.5 bg-indigo-50 text-indigo-500 rounded-md"><AlertCircle size={14}/></div>}
+                                              {admin.permissions.canSendEmails && <div title="Emails" className="p-1.5 bg-blue-50 text-blue-500 rounded-md"><Users size={14}/></div>}
+                                              {admin.permissions.canUploadResources && <div title="Uploads" className="p-1.5 bg-emerald-50 text-emerald-500 rounded-md"><Layers size={14}/></div>}
+                                          </div>
+                                      )}
+                                      
+                                      {canDelete && admin.email !== currentUser?.email && (
+                                          <button 
+                                            onClick={() => handleRemoveAdmin(admin.email)} 
+                                            className="text-gray-400 hover:text-red-500 p-3 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all group/delete"
+                                            title="Remove Member"
+                                          >
+                                              <Trash2 size={20} className="group-hover/delete:scale-110 transition-transform"/>
+                                          </button>
+                                      )}
+                                  </div>
                               </div>
                           ))}
                       </div>
                   </div>
                 )}
 
+                {activeTab === 'errors' && <ErrorReporting />}
                 {activeTab === 'logs' && <SystemLogs canDelete={canDelete} />}
-                {activeTab === 'settings' && <GlobalSettings canEdit={canEdit} />}
+                {activeTab === 'settings' && <GlobalSettings />}
               </motion.div>
             </AnimatePresence>
         </div>
       </div>
+      
+      <ConfirmationModal
+          isOpen={confirmModal.isOpen}
+          onClose={() => setConfirmModal({isOpen: false, email: null})}
+          onConfirm={proceedRemoveAdmin}
+          title="Remove Member?"
+          message={`Are you sure you want to remove ${confirmModal.email} from the team? This action cannot be undone.`}
+          isDeleting={loadingData}
+      />
     </motion.div>
   );
 };

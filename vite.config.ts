@@ -23,9 +23,10 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks: {
-            vendor: ['react', 'react-dom', 'react-router-dom'],
-            firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage', 'firebase/database'],
-            ui: ['framer-motion', 'lucide-react', 'recharts']
+            'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+            'firebase-vendor': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage', 'firebase/database'],
+            'ui-vendor': ['framer-motion', 'lucide-react', 'recharts'],
+            'ai-vendor': ['openai', '@google/generative-ai']
           },
         },
       },

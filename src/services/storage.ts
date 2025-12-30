@@ -80,7 +80,6 @@ export const DBService = {
       
       if (permission === 'granted') {
         const token = await getToken(messaging, { vapidKey: VAPID_KEY });
-        console.log("FCM Token Generated:", token);
         return token;
       } else {
         console.warn("Notification permission ignored/default.");
@@ -106,13 +105,35 @@ export const DBService = {
   },
 
   sendBroadcast: async (subject: string, message: string) => {
+      // Legacy support - sends to notification center
+      await DBService.sendNotification(subject, message);
+  },
+
+  sendNotification: async (title: string, body: string, link = '/', type = 'announcement') => {
       const timestamp = new Date().toISOString();
       await addDoc(collection(db, 'notifications'), {
-          title: subject,
-          subjectName: 'System Broadcast',
-          link: '/',
-          type: 'announcement',
-          createdAt: timestamp
+          title,
+          body,
+          subjectName: 'System Alert',
+          link,
+          type,
+          createdAt: timestamp,
+          readBy: []
+      });
+  },
+
+  sendEmail: async (subject: string, html: string) => {
+      // Writes to 'mail' collection for Firebase Extension to pick up
+      await addDoc(collection(db, 'mail'), {
+          to: 'noreply@obour.edu', // Broadcast usually implies bcc to all, but for extension payload structure:
+          message: {
+            subject: subject,
+            html: html,
+          },
+          // In a real app with "Trigger Email" extension, this prompts the email sending
+          delivery: {
+              startTime: new Date()
+          }
       });
   },
 
@@ -178,20 +199,40 @@ export const DBService = {
 
   // --- Subjects ---
   getSubjects: async (): Promise<Subject[]> => {
-    const q = query(collection(db, 'subjects'), orderBy('orderIndex', 'asc'));
+    const q = query(collection(db, 'subjects'), orderBy('name', 'asc'));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => {
-        const data = doc.data() as any;
+        const data = doc.data();
         return { 
             id: doc.id, 
-            ...data,
-            profName: data.profName || data.professorName || ''
+            name: data.name,
+            profName: data.profName || data.professorName || '',
+            color: data.color || 'bg-indigo-100',
+            icon: data.icon || 'BookOpen',
+            orderIndex: data.orderIndex || 0
         } as Subject
     });
   },
 
+  getSubject: async (id: string): Promise<Subject | null> => {
+      const docRef = doc(db, 'subjects', id);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+          const data = snap.data();
+          return { 
+              id: snap.id, 
+              name: data.name,
+              profName: data.profName || data.professorName || '',
+              color: data.color || 'bg-indigo-100',
+              icon: data.icon || 'BookOpen',
+              orderIndex: data.orderIndex || 0
+          } as Subject;
+      }
+      return null;
+  },
+
   subscribeToSubjects: (callback: (subjects: Subject[]) => void) => {
-    const q = query(collection(db, 'subjects'), orderBy('orderIndex', 'asc'));
+    const q = query(collection(db, 'subjects'), orderBy('name', 'asc'));
     return onSnapshot(q, (snapshot) => {
       const subjects = snapshot.docs.map(doc => {
         const data = doc.data() as any;
@@ -286,11 +327,25 @@ export const DBService = {
 
   addResource: async (resource: Omit<Resource, 'id' | 'dateAdded' | 'orderIndex'>): Promise<void> => {
     const timestamp = new Date().toISOString();
-    await addDoc(collection(db, 'resources'), {
+    const docRef = await addDoc(collection(db, 'resources'), {
       ...resource,
       dateAdded: timestamp,
       orderIndex: Date.now() 
     });
+
+    // Fetch Subject Name for clearer notification
+    let subjectName = 'New Update';
+    const sub = await DBService.getSubjects();
+    const found = sub.find(s => s.id === resource.subjectId);
+    if (found) subjectName = found.name;
+
+    // Trigger Notification
+    await DBService.sendNotification(
+        `New Resource: ${subjectName}`, 
+        resource.title, 
+        `/subject/${resource.subjectId}?highlight=${docRef.id}`, // Deep Link
+        'file'
+    );
   },
 
   updateResource: async (id: string, title: string, description: string): Promise<void> => {
@@ -322,11 +377,12 @@ export const DBService = {
   },
 
   // --- Team Management ---
-  addAdmin: async (email: string, role: UserRole): Promise<void> => {
+  addAdmin: async (email: string, role: UserRole, permissions?: any): Promise<void> => {
     await setDoc(doc(db, 'admins', email), {
       email,
       role,
-      addedAt: new Date().toISOString()
+      addedAt: new Date().toISOString(),
+      permissions
     });
   },
 
@@ -338,8 +394,72 @@ export const DBService = {
     await deleteDoc(doc(db, 'admins', email));
   },
 
+  // --- System Errors ---
+  reportError: async (errorMsg: string, context?: string) => {
+      try {
+          await addDoc(collection(db, 'system_errors'), {
+              error: errorMsg,
+              context: context || 'General',
+              timestamp: new Date().toISOString(),
+              resolved: false
+          });
+      } catch (e) {
+         console.error("Self-reporting failed", e);
+      }
+  },
+
+  getSystemErrors: async () => {
+      try {
+          const q = query(collection(db, 'system_errors'), orderBy('timestamp', 'desc'), limit(50));
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      } catch (e) {
+          console.error(e);
+          return [];
+      }
+  },
+
+  resolveError: async (id: string) => {
+      await setDoc(doc(db, 'system_errors', id), { resolved: true }, { merge: true });
+  },
+
+  // --- Team Management ---
   getAdmins: async (): Promise<AdminProfile[]> => {
     const snapshot = await getDocs(collection(db, 'admins'));
     return snapshot.docs.map(doc => doc.data() as AdminProfile);
+  },
+
+  // --- Inbox / Admin Chat ---
+  sendInboxMessage: async (userId: string, userEmail: string, message: string, attachments: {url: string, type: string}[] = []) => {
+      await addDoc(collection(db, 'inbox'), {
+          userId,
+          userEmail,
+          message,
+          attachments,
+          timestamp: new Date().toISOString(),
+          read: false,
+          archived: false
+      });
+  },
+
+  replyToUser: async (userId: string, message: string, originalMessageId?: string) => {
+      // Create a notification for the user
+      await addDoc(collection(db, 'notifications'), {
+          title: 'Admin Reply',
+          body: message,
+          link: '/#chatbot', // Direct them to chatbot
+          type: 'message',
+          recipientId: userId, // Targeted notification
+          relatedMessageId: originalMessageId,
+          createdAt: new Date().toISOString(),
+          read: false
+      });
+
+      // Also mark original message as replied (optional but good for UI)
+      if (originalMessageId) {
+          try {
+              await updateDoc(doc(db, 'inbox', originalMessageId), { replied: true });
+          } catch(e) { console.error("Failed to mark replied", e); }
+      }
   }
 };

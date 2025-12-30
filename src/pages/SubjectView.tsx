@@ -23,6 +23,13 @@ export const SubjectView: React.FC = () => {
   const [subject, setSubject] = useState<Subject | null>(null);
   const [resources, setResources] = useState<Resource[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [localSearch, setLocalSearch] = useState('');
+
+  // Debounce logic
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchQuery(localSearch), 300);
+    return () => clearTimeout(timer);
+  }, [localSearch]);
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [sortOption, setSortOption] = useState<SortOption>('date_desc');
@@ -31,9 +38,8 @@ export const SubjectView: React.FC = () => {
   useEffect(() => {
     const fetchSubject = async () => {
         if (id) {
-             const allSubjects = await DBService.getSubjects();
-             const foundSubject = allSubjects.find((s) => s.id === id);
-             setSubject(foundSubject || null);
+             const foundSubject = await DBService.getSubject(id);
+             setSubject(foundSubject);
         }
     };
     fetchSubject();
@@ -138,17 +144,18 @@ export const SubjectView: React.FC = () => {
           
           <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
              <div className="relative flex-grow sm:w-64">
-                <Search className="absolute left-3 top-3.5 h-5 w-5 text-gray-400" />
+                <Search className="absolute left-3 top-3.5 h-5 w-5 text-gray-400" aria-hidden="true" />
                 <input 
                     type="text" 
                     placeholder="Search..." 
-                    value={searchQuery} 
-                    onChange={(e) => setSearchQuery(e.target.value)} 
+                    aria-label="Search resources"
+                    value={localSearch} 
+                    onChange={(e) => setLocalSearch(e.target.value)} 
                     className="w-full pl-10 pr-4 py-3 bg-white text-gray-900 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 dark:text-white shadow-sm transition-all placeholder-gray-400" 
                 />
              </div>
              
-             <div className="w-full sm:w-48">
+             <div className="w-auto min-w-[210px]">
                  <CustomSelect 
                     value={sortOption}
                     onChange={(val) => setSortOption(val as SortOption)}
@@ -183,6 +190,7 @@ export const SubjectView: React.FC = () => {
                             canDelete={canDelete} 
                             onDeleteClick={setDeleteId} 
                             onDownloadClick={handleResourceClick} 
+                            index={filteredAndSortedResources.length - filteredAndSortedResources.indexOf(resource)} // Show 1 for newest if filtered, or just use map index + 1
                         />
                     </div>
                 ))}

@@ -79,9 +79,9 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ logs, su
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <motion.div whileHover={{ y: -5 }} className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+        <motion.div whileHover={{ y: -5 }} className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-full flex flex-col justify-center">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-full text-indigo-600">
+            <div className="w-12 h-12 flex items-center justify-center bg-indigo-50 dark:bg-indigo-900/30 rounded-full text-indigo-600 shrink-0">
               <Eye size={24} />
             </div>
             <div>
@@ -91,9 +91,9 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ logs, su
           </div>
         </motion.div>
         
-        <motion.div whileHover={{ y: -5 }} className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+        <motion.div whileHover={{ y: -5 }} className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-full flex flex-col justify-center">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-green-50 dark:bg-green-900/30 rounded-full text-green-600">
+            <div className="w-12 h-12 flex items-center justify-center bg-green-50 dark:bg-green-900/30 rounded-full text-green-600 shrink-0">
               <FileText size={24} />
             </div>
             <div>
@@ -103,9 +103,9 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ logs, su
           </div>
         </motion.div>
 
-        <motion.div whileHover={{ y: -5 }} className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+        <motion.div whileHover={{ y: -5 }} className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-full flex flex-col justify-center">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-purple-50 dark:bg-purple-900/30 rounded-full text-purple-600">
+            <div className="w-12 h-12 flex items-center justify-center bg-purple-50 dark:bg-purple-900/30 rounded-full text-purple-600 shrink-0">
               <BarChart2 size={24} />
             </div>
             <div>
@@ -115,9 +115,9 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ logs, su
           </div>
         </motion.div>
 
-        <motion.div whileHover={{ y: -5 }} className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+        <motion.div whileHover={{ y: -5 }} className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-full flex flex-col justify-center">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-amber-50 dark:bg-amber-900/30 rounded-full text-amber-600 relative">
+            <div className="w-12 h-12 flex items-center justify-center bg-amber-50 dark:bg-amber-900/30 rounded-full text-amber-600 relative shrink-0">
               <Users size={24} />
               <span className="absolute top-0 right-0 h-3 w-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-800 animate-pulse"></span>
             </div>

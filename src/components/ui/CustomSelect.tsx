@@ -64,10 +64,10 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full flex items-center justify-between transition-all duration-300 outline-none focus:outline-none focus:ring-0
-          bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-transparent
+          bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-600
           ${isOpen 
-            ? 'ring-4 ring-indigo-500/20 border-indigo-500 shadow-xl z-20' 
-            : 'hover:bg-gray-50 dark:hover:bg-gray-700 shadow-sm hover:shadow-md'
+            ? 'ring-4 ring-indigo-500/20 border-indigo-500 shadow-xl z-20 bg-white dark:bg-gray-800' 
+            : 'hover:bg-white dark:hover:bg-gray-800 hover:border-gray-300 shadow-sm hover:shadow-md'
           }
           ${triggerClassName ? triggerClassName : 'p-3.5 rounded-2xl'}
         `}

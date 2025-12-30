@@ -3,6 +3,7 @@ import { Navbar } from './Navbar';
 import { Share2 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { CookieConsent } from '../features/CookieConsent';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { dir } = useLanguage();
@@ -38,15 +39,15 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
       {/* Footer Pushed to Bottom */}
       <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-auto transition-colors duration-300 w-full z-10 relative">
-        <div className="max-w-7xl mx-auto py-8 px-4 flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">
+        <div className="max-w-7xl mx-auto py-8 px-4 flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-left">
+            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium order-2 md:order-1">
             Obour Institutes &copy; {new Date().getFullYear()} | Developed by Ahmed Alaa
             </p>
             <a 
               href="https://linktr.ee/sir.ahmed" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="group flex items-center gap-2 px-5 py-2.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-full text-sm font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all hover:scale-105"
+              className="order-1 md:order-2 group flex items-center gap-2 px-5 py-2.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-full text-sm font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all hover:scale-105"
             >
               Social Media 
               <Share2 size={14} className="group-hover:rotate-12 transition-transform"/>

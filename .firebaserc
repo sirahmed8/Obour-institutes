@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "obourinstitutes"
-  }
+  },
+  "targets": {
+    "obour-institutes-a607d": {
+      "hosting": {
+        "obourinstitutes": [
+          "obourinstitutes"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

@@ -2,13 +2,22 @@
 import { Book, Code, Calculator, Beaker, Globe, Briefcase, Music, Cpu, Database, PenTool, Layout, Server, Shield, FileText, Atom, Cloud, Smartphone, Wifi, Terminal, Grid, BarChart, Layers } from 'lucide-react';
 
 // --- RBAC & Users ---
-// 'super_admin' is displayed as "OWNER" in UI
-export type UserRole = 'super_admin' | 'editor' | 'viewer';
+// 'super_admin' is the top-level owner with all permissions
+export type UserRole = 'super_admin' | 'admin' | 'viewer';
+
+export interface AdminPermissions {
+  canCreateBanner: boolean;
+  canSendEmails: boolean;
+  canSendNotifications: boolean;
+  canUploadResources: boolean;
+  canEditSubjects: boolean;
+}
 
 export interface AdminProfile {
   email: string;
   role: UserRole;
   addedAt: string;
+  permissions?: AdminPermissions; // Only for 'admin' role
 }
 
 export interface UserData {
@@ -59,8 +68,10 @@ export interface Log {
 export interface SystemSettings {
   announcement: string;
   showAnnouncement: boolean;
+  bannerType?: 'info' | 'warning' | 'success' | 'announcement';
   apiBaseUrl?: string;
   bannerHistory?: { text: string, date: string }[];
+  chatbotMode?: 'online' | 'offline'; // Toggle between AI API and offline mode
 }
 
 export const ICON_MAP: { [key: string]: any } = {

@@ -1,10 +1,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, Send, X, BrainCircuit } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
+import { motion, AnimatePresence, useDragControls } from 'framer-motion';
+import { Bot, Send, X, Wifi, WifiOff, Paperclip, Shield, Sparkles, ChevronDown, Cpu, Lock, Brain, Globe, MessageSquare, Trash2 } from 'lucide-react';
 import { DBService } from '../../services/storage';
+import { getOfflineResponse } from '../../services/offlineChatbot';
 import Markdown from 'react-markdown';
+import { useAuth } from '../../context/AuthContext';
+import { generateAIResponse, AIModel } from '../../services/aiService';
+import { ConfirmationModal } from '../ui/ConfirmationModal';
 
 interface Message {
   role: 'user' | 'model';
@@ -12,100 +15,211 @@ interface Message {
 }
 
 export const AIChatbot: React.FC = () => {
+  const { currentUser } = useAuth();
+  
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'model', text: "Hello! I'm **Obour AI**, your specialized study assistant. I'm here to help you navigate courses, summarize lecture notes, and find relevant study material. What can I do for you today?" }
+    { role: 'model', text: "Hello! 👋 I'm **Obour AI**. \n\nI can help you find courses, summarize notes, or answer questions about the institute. \n\n*Switch to 'Online Mode' for AI-powered answers!*" }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [fullContext, setFullContext] = useState<string>('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [chatbotMode, setChatbotMode] = useState<'online' | 'offline' | 'admin'>('offline');
+  const [selectedModel, setSelectedModel] = useState<AIModel>('gemini');
+  const [showModelMenu, setShowModelMenu] = useState(false);
+  
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Keyboard Awareness Logic
-  const [viewportHeight, setViewportHeight] = useState('100dvh');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const constraintsRef = useRef(null);
+  const dragControls = useDragControls();
+
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   useEffect(() => {
     if (!window.visualViewport) return;
+    
     const handleResize = () => {
-      // Create a small buffer or just use the height directly
-      setViewportHeight(`${window.visualViewport!.height}px`);
+      const viewportHeight = window.visualViewport!.height;
+      const windowHeight = window.innerHeight;
+      const newKeyboardHeight = windowHeight - viewportHeight;
+      setKeyboardHeight(Math.max(0, newKeyboardHeight));
     };
+    
     window.visualViewport.addEventListener('resize', handleResize);
-    return () => window.visualViewport!.removeEventListener('resize', handleResize);
+    window.visualViewport.addEventListener('scroll', handleResize);
+    
+    return () => {
+      window.visualViewport!.removeEventListener('resize', handleResize);
+      window.visualViewport.removeEventListener('scroll', handleResize);
+    };
   }, []);
 
   useEffect(() => {
-    if (isOpen && !fullContext) {
-      DBService.getAllDataForAI().then(setFullContext);
+    const savedMode = localStorage.getItem('chatbot_mode') as 'online' | 'offline' | 'admin' | null;
+    const savedModel = localStorage.getItem('ai_model') as AIModel | null;
+    
+    if (savedMode) setChatbotMode(savedMode);
+    else setChatbotMode('offline');
+
+    if (savedModel) setSelectedModel(savedModel);
+
+    const savedMessages = localStorage.getItem('chat_history');
+    if (savedMessages) {
+        try {
+            setMessages(JSON.parse(savedMessages));
+        } catch (e) { console.error("History load failed", e); }
     }
-  }, [isOpen, fullContext]);
+  }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length > 0) { 
+        localStorage.setItem('chat_history', JSON.stringify(messages));
+    }
   }, [messages]);
 
+  const changeMode = (mode: 'online' | 'offline' | 'admin') => {
+    setChatbotMode(mode);
+    localStorage.setItem('chatbot_mode', mode);
+    setShowModelMenu(false);
 
-  const [lastMessage, setLastMessage] = useState<string>('');
-  const constraintsRef = useRef(null);
+    if (mode === 'admin') {
+        const lastMsg = messages[messages.length - 1];
+        if (!lastMsg || !lastMsg.text.includes('Support Mode Activated')) {
+             setMessages(prev => [...prev, { role: 'model', text: "Support Mode Activated 🛡️\n\nHow can we help? Your messages will be sent directly to the institute administration." }]);
+        }
+    } else {
+         const modeName = mode === 'online' ? 'Online AI' : 'Offline AI';
+         setMessages(prev => [...prev, { role: 'model', text: `Switched to **${modeName}** mode.` }]);
+    }
+  };
+
+  const handleModelChange = (model: AIModel) => {
+      setSelectedModel(model);
+      localStorage.setItem('ai_model', model);
+      setShowModelMenu(false);
+      
+      let modelName = 'Gemini';
+      if (model === 'openrouter') modelName = 'GPT-OSS (Free)';
+      if (model === 'deepseek') modelName = 'DeepSeek V3';
+      if (model === 'kimi') modelName = 'Kimi AI';
+
+      setMessages(prev => [...prev, { role: 'model', text: `AI Model switched to **${modelName}**.` }]);
+  };
+
+  useEffect(() => {
+    if (isOpen && !fullContext && chatbotMode !== 'admin') {
+      DBService.getAllDataForAI().then(setFullContext);
+    }
+  }, [isOpen, fullContext, chatbotMode]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+  }, [messages]);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      setIsUploading(true);
+      try {
+          const result = await DBService.uploadFile(file);
+          const text = `Attached File: [${file.name}](${result.url})`;
+          setMessages(prev => [...prev, { role: 'user', text }]);
+          
+          if (chatbotMode === 'admin') {
+              await DBService.sendInboxMessage(
+                  currentUser?.uid || 'guest', 
+                  currentUser?.email || 'guest@obour.edu', 
+                  text,
+                  [{ url: result.url, type: result.format }]
+              );
+              setTimeout(() => {
+                 setMessages(prev => [...prev, { role: 'model', text: "File sent to admin." }]);
+              }, 500);
+          } else {
+              setTimeout(() => {
+                  setMessages(prev => [...prev, { role: 'model', text: "I've received your file. While I can't analyze it directly yet, I've noted it." }]);
+              }, 1000);
+          }
+      } catch (error) {
+          console.error(error);
+          setMessages(prev => [...prev, { role: 'model', text: "⚠️ Failed to upload file." }]);
+      } finally {
+          setIsUploading(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+  };
 
   const handleSend = async (retryText?: string) => {
     const textToSend = retryText || input;
     if (!textToSend.trim()) return;
 
-    // 1. Instantly show user message
     if (!retryText) {
        setMessages((prev) => [...prev, { role: 'user', text: textToSend }]);
-       setLastMessage(textToSend); // Save for retry
        setInput('');
     }
     setLoading(true);
 
+    if (chatbotMode === 'admin') {
+        try {
+            await DBService.sendInboxMessage(
+                currentUser?.uid || 'guest', 
+                currentUser?.email || 'guest@obour.edu', 
+                textToSend
+            ); 
+            await new Promise(resolve => setTimeout(resolve, 800));
+            setMessages((prev) => [...prev, { role: 'model', text: "Message sent to administration. We'll get back to you shortly!" }]);
+        } catch (e) {
+            setMessages((prev) => [...prev, { role: 'model', text: "⚠️ Failed to send message. Please try again." }]);
+        } finally {
+            setLoading(false);
+        }
+        return;
+    }
+
+    if (chatbotMode === 'offline') {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const response = getOfflineResponse(textToSend);
+      setMessages((prev) => [...prev, { role: 'model', text: response }]);
+      setLoading(false);
+      return;
+    }
+
     try {
-      // 2. Initialize AI (using @google/genai SDK pattern)
-      const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_GOOGLE_API_KEY });
-
-      // 3. Contextual Prompt
-      const systemPrompt = `
-        You are "Obour AI", a helpful academic assistant.
-        CONTEXT: ${fullContext}
-        Answer concisely and helpfully.
-      `;
-      
-      // 4. Generate with CORRECT Payload Structure
-      const response = await ai.models.generateContent({
-        model: 'gemini-1.5-flash',
-        contents: [
-            { 
-                role: 'user', 
-                parts: [{ text: systemPrompt + "\n\nUser: " + textToSend }] 
-            }
-        ] 
-      });
-
-      // Handle response.text() safely (SDK version variance)
-      // Cast to any to bypass TS error: "expression is not callable because it is a 'get' accessor"
-      const responseAny = response as any;
-      const text = typeof responseAny.text === 'function' ? responseAny.text() : (responseAny.text || "I'm thinking...");
-      
-      setMessages((prev) => [...prev, { role: 'model', text: typeof text === 'string' ? text : "Received non-text response." }]);
-    } catch (error) {
-      console.error("Gemini Error:", error);
-      setMessages((prev) => [
-        ...prev,
-        { role: 'model', text: `**System Error**: Comparison mismatch or Network fail. details: ${error}` }
-      ]);
+        const responseText = await generateAIResponse(textToSend, fullContext, selectedModel);
+        setMessages((prev) => [...prev, { role: 'model', text: responseText }]);
+    } catch (error: any) {
+      console.error("AI Error:", error);
+       let errorMsg = `⚠️ **Connection Issue**\n\n`;
+       if (error?.message?.includes('400') || error?.message?.includes('API key') || error?.message?.includes(' quota')) {
+          errorMsg += `I'm currently receiving too many requests or my cloud connection is resting. 😓\n\nSwitched to **Offline Mode** automatically. I can still help with basic questions!`;
+          setChatbotMode('offline'); 
+       } else {
+          const offlineResponse = getOfflineResponse(textToSend);
+          errorMsg += `I couldn't reach the cloud. Here is what I found in my local database:\n\n${offlineResponse}`;
+       }
+       setMessages((prev) => [...prev, { role: 'model', text: errorMsg }]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRetry = () => {
-     // Remove last system error message
-     setMessages(prev => prev.filter(m => !m.text.includes('System Error')));
-     // Retry last message
-     if (lastMessage) { 
-         handleSend(lastMessage);
-     }
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
+  const getModelLabel = () => {
+    if (chatbotMode === 'admin') return 'Support';
+    if (chatbotMode === 'offline') return 'Offline';
+    switch (selectedModel) {
+        case 'gemini': return 'Gemini';
+        case 'openrouter': return 'GPT-OSS';
+        case 'deepseek': return 'DeepSeek';
+        case 'kimi': return 'Kimi AI';
+        default: return 'Gemini';
+    }
   };
 
   return (
@@ -115,18 +229,16 @@ export const AIChatbot: React.FC = () => {
         {!isOpen && (
           <motion.button
             key="chatbot-fab"
-            layout // Enable layout animation for smooth position changes
-            drag
-            dragConstraints={constraintsRef}
-            whileHover={{ scale: 1.1, rotate: -5 }}
+            layout
+            whileHover={{ scale: 1.2, rotate: -10 }}
             whileTap={{ scale: 0.9 }}
             initial={{ scale: 0, opacity: 0, y: 50 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0, opacity: 0, y: 50 }}
             onClick={() => setIsOpen(true)}
-            className="fixed bottom-6 right-6 pointer-events-auto p-4 bg-gradient-to-tr from-indigo-600 to-purple-600 text-white rounded-full shadow-[0_10px_30px_-10px_rgba(79,70,229,0.6)] flex items-center justify-center transition-shadow animate-breath hover:shadow-indigo-500/50 cursor-grab active:cursor-grabbing"
+            className="fixed bottom-6 right-6 z-50 pointer-events-auto p-4 bg-gradient-to-tr from-indigo-600 to-purple-600 text-white rounded-full shadow-[0_10px_30px_-10px_rgba(79,70,229,0.6)] flex items-center justify-center transition-shadow animate-breath hover:shadow-indigo-500/80 hover:ring-4 hover:ring-indigo-300 dark:hover:ring-indigo-900 mb-16 md:mb-0"
           >
-            <BrainCircuit size={28} />
+            <Bot size={32} />
           </motion.button>
         )}
       </AnimatePresence>
@@ -135,42 +247,89 @@ export const AIChatbot: React.FC = () => {
         {isOpen && (
           <motion.div
             key="chatbot-window"
-            drag
+            drag={!isMobile}
+            dragControls={dragControls}
+            dragListener={false}
             dragConstraints={constraintsRef}
             dragElastic={0.05}
-            initial={{ opacity: 0, scale: 0.9, y: 20, x: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20, x: 20, transition: { duration: 0.2 } }}
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20, transition: { duration: 0.2 } }}
             transition={{ type: "spring", stiffness: 350, damping: 30 }}
             style={{ 
-              height: window.innerWidth < 768 ? viewportHeight : '600px',
-              // Use fixed positioning but valid standard CSS for initial placement
-              // The drag will use transform
+              height: isMobile ? '60vh' : '650px',
               position: 'fixed',
-              bottom: window.innerWidth < 768 ? 0 : '1.5rem',
-              right: window.innerWidth < 768 ? 0 : '1.5rem',
-              width: window.innerWidth < 768 ? '100%' : '400px',
-              borderRadius: window.innerWidth < 768 ? '0' : '2rem'
+              bottom: isMobile ? '6rem' : '1.5rem', 
+              right: isMobile ? '0' : '1.5rem',
+              top: 'auto',
+              width: isMobile ? '100%' : '420px',
+              borderRadius: isMobile ? '1.5rem 1.5rem 0 0' : '2rem',
+              transformOrigin: 'bottom right',
+              paddingBottom: isMobile ? 'env(safe-area-inset-bottom)' : '0'
             }}
-            className="pointer-events-auto bg-white dark:bg-gray-900 shadow-2xl flex flex-col border-0 md:border border-indigo-50 dark:border-gray-800 overflow-hidden cursor-move"
+            className="pointer-events-auto bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl shadow-2xl flex flex-col border-0 md:border border-indigo-50 dark:border-white/10 overflow-hidden z-[9999] fixed-ios-input"
+            dir="auto"
           >
             {/* Header */}
-            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 md:p-5 flex justify-between items-center text-white shrink-0 shadow-md z-10 cursor-grab active:cursor-grabbing">
+            <motion.div 
+              onPointerDown={(e) => !isMobile && dragControls.start(e)}
+              className={`p-4 md:p-5 flex justify-between items-center text-white shrink-0 shadow-md z-10 cursor-grab active:cursor-grabbing select-none transition-colors duration-500 ${
+                  chatbotMode === 'admin' 
+                  ? 'bg-gradient-to-r from-gray-800 to-gray-900' 
+                  : 'bg-gradient-to-r from-indigo-600 to-purple-600'
+              }`}
+            >
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm"><Bot size={24} /></div>
+                <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+                    {chatbotMode === 'admin' ? <Shield size={24} /> : <Bot size={24} />}
+                </div>
                 <div>
-                    <h3 className="font-black text-lg leading-tight">Obour AI</h3>
-                    <p className="text-[10px] uppercase font-bold opacity-80 tracking-widest">Study Assistant</p>
+                    <h3 className="font-black text-lg leading-tight flex items-center gap-2">
+                      {chatbotMode === 'admin' ? 'Support' : 'Obour AI'}
+                      <div className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 transition-all ${
+                          chatbotMode === 'offline' ? 'bg-amber-400/30 text-amber-100' : 
+                          chatbotMode === 'admin' ? 'bg-gray-500/30 text-gray-200' : 
+                          'bg-emerald-400/30 text-emerald-100'
+                        }`}
+                      >
+                        {chatbotMode === 'offline' ? <WifiOff size={10} /> : chatbotMode === 'admin' ? <Shield size={10}/> : <Wifi size={10} />}
+                        {getModelLabel()}
+                      </div>
+                    </h3>
+                    <p className="text-[10px] uppercase font-bold opacity-80 tracking-widest">
+                        {chatbotMode === 'admin' ? 'Direct Message' : 'Central AI Hub'}
+                    </p>
                 </div>
               </div>
-              <button 
-                onClick={() => setIsOpen(false)} 
-                className="w-8 h-8 rounded-full hover:bg-white/20 flex items-center justify-center transition-colors focus:bg-white/30 active:scale-95"
-              >
-                <X size={20} />
-              </button>
-            </div>
+              <div className="flex items-center gap-1">
+                  <button 
+                      onClick={() => setShowClearConfirm(true)}
+                      className="w-8 h-8 rounded-full hover:bg-white/20 flex items-center justify-center transition-colors focus:bg-white/30 active:scale-95"
+                      title="Clear History"
+                  >
+                      <Trash2 size={16} />
+                  </button>
+                  <button 
+                      onClick={() => setIsOpen(false)} 
+                      className="w-8 h-8 rounded-full hover:bg-white/20 flex items-center justify-center transition-colors focus:bg-white/30 active:scale-95"
+                  >
+                      <X size={20} />
+                  </button>
+              </div>
+            </motion.div>
 
+            {/* Content Area - Gated by Auth */}
+            {!currentUser ? (
+              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50 dark:bg-gray-900">
+                  <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4 text-gray-400">
+                      <Lock size={32} />
+                  </div>
+                  <h3 className="text-xl font-bold dark:text-white mb-2">Login Required</h3>
+                  <p className="text-gray-500 text-sm mb-6">You need to sign in to chat with Obour AI.</p>
+                  <p className="text-xs text-indigo-500 font-bold">Please log in securely with your Google account.</p>
+              </div>
+            ) : (
+              <>
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-5 bg-gray-50 dark:bg-gray-950/50 custom-scrollbar scroll-smooth">
               {messages.map((msg, idx) => (
@@ -186,63 +345,152 @@ export const AIChatbot: React.FC = () => {
                       ? 'bg-indigo-600 text-white rounded-br-none' 
                       : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-bl-none border border-gray-100 dark:border-gray-700'
                   }`}>
-                      {msg.text.includes('System Error') ? (
-                          <div className="flex flex-col gap-2">
-                              <span className="flex items-center gap-2 text-red-200"><span className="w-2 h-2 bg-red-400 rounded-full animate-pulse"/> Connection Failed</span>
-                              <p>{msg.text.replace('**System Error**: ', '')}</p>
-                              <button 
-                                onClick={handleRetry}
-                                className="mt-2 text-xs bg-white text-indigo-600 font-bold px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors w-fit self-start"
-                              >
-                                Retry Connection
-                              </button>
-                          </div>
-                      ) : (
-                        <Markdown className="prose prose-sm dark:prose-invert break-words leading-relaxed text-inherit">
-                          {msg.text}
-                        </Markdown>
-                      )}
+                      <Markdown className="prose prose-sm dark:prose-invert break-words leading-relaxed text-inherit">
+                        {msg.text}
+                      </Markdown>
                   </div>
                 </motion.div>
               ))}
-              
               {loading && (
                  <div className="flex justify-start">
-                   <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl rounded-bl-none shadow-sm border border-gray-100 dark:border-gray-700">
-                      <div className="flex gap-1.5">
-                        <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1 }} className="w-2 h-2 bg-indigo-500 rounded-full" />
-                        <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-2 h-2 bg-indigo-500 rounded-full" />
-                        <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-2 h-2 bg-indigo-500 rounded-full" />
-                      </div>
+                   <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl rounded-bl-none shadow-sm border border-gray-100 dark:border-gray-700 flex gap-1.5">
+                      <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1 }} className="w-2 h-2 bg-indigo-500 rounded-full" />
+                      <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-2 h-2 bg-indigo-500 rounded-full" />
+                      <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-2 h-2 bg-indigo-500 rounded-full" />
                    </div>
                  </div>
               )}
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
-            <div className="p-3 md:p-4 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex gap-3 shrink-0 pb-safe shadow-[0_-5px_20px_-10px_rgba(0,0,0,0.05)] z-20">
-              <input
-                type="text"
-                autoFocus={window.innerWidth >= 768}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                placeholder="Ask your question..."
-                className="flex-1 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-2xl px-5 py-3.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm font-medium placeholder-gray-400 transition-all"
-              />
-              <motion.button 
-                onClick={() => handleSend()} 
-                disabled={!input.trim() || loading} 
-                whileTap={{ scale: 0.95 }}
-                className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-2xl shadow-lg shadow-indigo-500/30 flex items-center justify-center disabled:opacity-50 disabled:shadow-none transition-all shrink-0"
-              >
-                <Send size={20} />
-              </motion.button>
+            {/* Config & Input Area */}
+            <div className="bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 z-20">
+                {/* Advanced Settings Bar (Bottom) */}
+                <div className="px-4 py-2 flex items-center justify-between border-b border-gray-50 dark:border-gray-800">
+                    <div className="flex gap-2">
+                         {/* Mode Switcher */}
+                         <div className="relative">
+                            <button
+                                onClick={() => setShowModelMenu(!showModelMenu)}
+                                className="flex items-center gap-1.5 text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                            >
+                                {chatbotMode === 'admin' ? <Shield size={14} /> : chatbotMode === 'offline' ? <WifiOff size={14} /> : <Sparkles size={14} />}
+                                {getModelLabel()}
+                                <ChevronDown size={12} />
+                            </button>
+                            
+                            {/* Dropdown Menu */}
+                            <AnimatePresence>
+                                {showModelMenu && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: 10 }}
+                                        className="absolute bottom-full left-0 mb-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden p-1.5 z-50"
+                                    >
+                                        <button onClick={() => { changeMode('online'); handleModelChange('gemini'); }} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 ${selectedModel === 'gemini' && chatbotMode === 'online' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 dark:text-gray-300 hover:bg-slate-700 hover:text-white'}`}>
+                                            <Sparkles size={14} className="text-indigo-500"/> Gemini 2.5
+                                        </button>
+                                        
+                                        <button onClick={() => { changeMode('online'); handleModelChange('openrouter'); }} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 ${selectedModel === 'openrouter' && chatbotMode === 'online' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 dark:text-gray-300 hover:bg-slate-700 hover:text-white'}`}>
+                                            <Globe size={14} className="text-blue-500"/> GPT-OSS (Free)
+                                        </button>
+
+                                        <button onClick={() => { changeMode('online'); handleModelChange('deepseek'); }} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 ${selectedModel === 'deepseek' && chatbotMode === 'online' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 dark:text-gray-300 hover:bg-slate-700 hover:text-white'}`}>
+                                            <Brain size={14} className="text-purple-500"/> DeepSeek V3
+                                        </button>
+
+                                        <button onClick={() => { changeMode('online'); handleModelChange('kimi'); }} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 ${selectedModel === 'kimi' && chatbotMode === 'online' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 dark:text-gray-300 hover:bg-slate-700 hover:text-white'}`}>
+                                            <MessageSquare size={14} className="text-pink-500"/> Kimi AI
+                                        </button>
+                                        
+                                        <div className="h-px bg-gray-100 dark:bg-gray-700 my-1"/>
+                                        <p className="px-2 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">System</p>
+                                        
+                                        <div className="px-2 py-1 text-[10px] text-gray-500 leading-tight">
+                                           Choose your AI brain! Switch between Gemini (Fast), GPT-OSS (Free), or DeepSeek (Smart).
+                                        </div>
+
+                                        <button onClick={() => changeMode('offline')} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 ${chatbotMode === 'offline' ? 'bg-amber-50 text-amber-600' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50'}`}>
+                                            <WifiOff size={14} className="text-amber-500"/> Offline Mode
+                                        </button>
+                                        <button onClick={() => changeMode('admin')} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 ${chatbotMode === 'admin' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50'}`}>
+                                            <Shield size={14} className="text-gray-500"/> Contact Support
+                                        </button>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                         </div>
+                    </div>
+                </div>
+
+                {/* Input Field */}
+                <motion.div 
+                  layout
+                  className="p-3 md:p-4 flex gap-3 items-end"
+                >
+                  <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      className="hidden" 
+                      onChange={handleFileUpload}
+                      accept="image/*,application/pdf"
+                  />
+                  <button 
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={loading || isUploading}
+                      className="p-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                      title="Upload file (Image or PDF)"
+                  >
+                      {isUploading ? <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full"/> : <Paperclip size={20} />}
+                  </button>
+
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    autoFocus={!isMobile}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                    placeholder={chatbotMode === 'admin' ? "Message details..." : `Ask ${getModelLabel()}...`}
+                    className="flex-1 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-2xl px-5 py-3.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm font-medium placeholder-gray-400 transition-all"
+                  />
+                  <motion.button 
+                    onClick={() => handleSend()} 
+                    disabled={!input.trim() || loading} 
+                    whileTap={{ scale: 0.95 }}
+                    className={`w-12 h-12 text-white rounded-2xl shadow-lg flex items-center justify-center disabled:opacity-50 disabled:shadow-none transition-all shrink-0 ${
+                        chatbotMode === 'admin'
+                        ? 'bg-gray-800 hover:bg-gray-900 shadow-gray-500/30'
+                        : selectedModel === 'openrouter'
+                        ? 'bg-gradient-to-br from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 shadow-blue-500/30'
+                        : selectedModel === 'deepseek'
+                        ? 'bg-gradient-to-br from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 shadow-purple-500/30'
+                        : 'bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-indigo-500/30'
+                    }`}
+                  >
+                    <Send size={20} />
+                  </motion.button>
+                </motion.div>
             </div>
+              </>
+            )}
+
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ConfirmationModal
+         isOpen={showClearConfirm}
+         onClose={() => setShowClearConfirm(false)}
+         onConfirm={() => {
+             localStorage.removeItem('chat_history');
+             setMessages([{ role: 'model', text: "Chat history cleared. How can I help you now? ✨" }]);
+             setShowClearConfirm(false);
+         }}
+         title="Clear History?"
+         message="Are you sure you want to delete your entire conversation history? This cannot be undone."
+      />
     </>
   );
 };

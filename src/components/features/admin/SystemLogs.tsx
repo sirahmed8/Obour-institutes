@@ -49,7 +49,6 @@ export const SystemLogs: React.FC<{ canDelete: boolean }> = ({ canDelete }) => {
             onConfirm={handleClearLogs}
             title="Clear System Logs"
             message="Are you sure you want to delete all system activity logs? This action cannot be undone."
-            isDeleting={true}
         />
 
         <div className="flex justify-between items-center bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
@@ -58,7 +57,14 @@ export const SystemLogs: React.FC<{ canDelete: boolean }> = ({ canDelete }) => {
                 <p className="text-sm text-gray-500">Latest 100 actions performed on the platform.</p>
             </div>
             <div className="flex gap-2">
-                <button onClick={fetchLogs} className="p-2 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 transition-colors"><RefreshCcw size={18}/></button>
+                <button 
+                  onClick={fetchLogs} 
+                  disabled={loading}
+                  className="bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 p-3 rounded-2xl shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-100 dark:border-gray-700 transition-all active:scale-95 disabled:opacity-50"
+                  title="Refresh Logs"
+                >
+                    <RefreshCcw size={18} className={loading ? "animate-spin" : ""} />
+                </button>
                 {canDelete && <button onClick={() => setIsClearModalOpen(true)} className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-sm font-bold transition-colors">Clear Logs</button>}
             </div>
         </div>

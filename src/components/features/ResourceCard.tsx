@@ -9,13 +9,15 @@ interface ResourceCardProps {
   canDelete: boolean;
   onDeleteClick: (id: string) => void;
   onDownloadClick: (resource: Resource) => void; 
+  index?: number;
 }
 
 export const ResourceCard: React.FC<ResourceCardProps> = ({ 
   resource, 
   canDelete, 
   onDeleteClick,
-  onDownloadClick
+  onDownloadClick,
+  index
 }) => {
   const urlLower = resource.url.toLowerCase();
   
@@ -70,6 +72,7 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
                 <div className="mb-2">
                     <div className="flex justify-between items-start">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1 block">
+                            {index && <span className="text-indigo-500 mr-1">#{index}</span>}
                             {getLabel()}
                         </span>
                         {canDelete && (
@@ -101,6 +104,7 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
                         href={resource.url}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => onDownloadClick(resource)}
                         className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-indigo-600 dark:hover:bg-indigo-500 hover:text-white text-gray-700 dark:text-gray-200 text-xs font-bold rounded-xl transition-all shadow-sm group-hover:shadow-md no-underline"
                     >
                         <ExternalLink size={14} /> Open

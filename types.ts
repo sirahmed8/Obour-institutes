@@ -56,6 +56,7 @@ export interface Log {
 export interface SystemSettings {
   announcement: string;
   showAnnouncement: boolean;
+  chatbotMode?: 'online' | 'offline'; // New: Toggle between AI API and offline mode
 }
 
 // --- Visuals ---

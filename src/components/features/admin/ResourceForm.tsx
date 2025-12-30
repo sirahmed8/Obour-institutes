@@ -122,7 +122,13 @@ export const ResourceForm: React.FC<ResourceFormProps> = ({ subjects = [], onSuc
       <form onSubmit={handleSubmit} className="space-y-8">
         <div>
            <label className="block text-xs font-black uppercase text-gray-400 mb-3 tracking-[0.2em]">Target Course</label>
-           <CustomSelect value={subjectId} onChange={setSubjectId} options={subjectOptions} placeholder="Choose Course..." />
+           {subjects.length === 0 ? (
+               <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-2xl border border-dashed border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 font-bold text-center text-sm">
+                   No courses available. Create a course first.
+               </div>
+           ) : (
+               <CustomSelect value={subjectId} onChange={setSubjectId} options={subjectOptions} placeholder="Choose Course..." />
+           )}
         </div>
 
         <div>
@@ -143,20 +149,20 @@ export const ResourceForm: React.FC<ResourceFormProps> = ({ subjects = [], onSuc
 
         <div>
             <label className="block text-xs font-black uppercase text-gray-400 mb-3 tracking-[0.2em]">Asset Category</label>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {typeOptions.map((opt) => (
                     <button
                         key={opt.id}
                         type="button"
                         onClick={() => setResourceType(opt.id as any)}
-                        className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all duration-300 ${
+                        className={`flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 ${
                             resourceType === opt.id 
-                            ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 scale-105 z-10' 
-                            : 'border-gray-100 dark:border-gray-700 hover:bg-gray-50'
+                            ? 'border-indigo-600 bg-indigo-600 text-white scale-105 z-10 shadow-lg shadow-indigo-500/30' 
+                            : 'border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-500'
                         }`}
                     >
-                        <opt.icon className={`mb-2 ${opt.color}`} size={24} />
-                        <span className="text-[10px] font-black text-gray-500 dark:text-gray-300 uppercase tracking-widest">{opt.label}</span>
+                        <opt.icon className={`mb-1 sm:mb-2 ${resourceType === opt.id ? 'text-white' : opt.color}`} size={20} />
+                        <span className={`text-[8px] sm:text-[10px] font-black uppercase tracking-wide truncate w-full text-center ${resourceType === opt.id ? 'text-white' : 'text-gray-500 dark:text-gray-300'}`}>{opt.label}</span>
                     </button>
                 ))}
             </div>

@@ -20,13 +20,26 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark');
 
-    if (theme === 'system') {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      root.classList.add(systemTheme);
-    } else {
-      root.classList.add(theme);
-    }
+    const applyTheme = (t: Theme) => {
+        if (t === 'system') {
+            const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            root.classList.remove('light', 'dark'); // Ensure clean state
+            root.classList.add(systemTheme);
+        } else {
+            root.classList.add(t);
+        }
+    };
+
+    applyTheme(theme);
     localStorage.setItem('theme', theme);
+
+    // Listen for system changes if mode is system
+    if (theme === 'system') {
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const handler = () => applyTheme('system');
+        mediaQuery.addEventListener('change', handler);
+        return () => mediaQuery.removeEventListener('change', handler);
+    }
   }, [theme]);
 
   return (
