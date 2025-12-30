@@ -46,11 +46,21 @@ export const generateAIResponse = async (message: string, context: string, model
         return result.response.text();
 
       case 'openrouter':
-        const orResponse = await openRouter.chat.completions.create({
-          model: "openai/gpt-oss-20b:free", 
-          messages: [{ role: "user", content: fullPrompt }],
-        });
-        return orResponse.choices[0].message.content || "No response.";
+        try {
+          const orResponse = await openRouter.chat.completions.create({
+            model: "openai/gpt-oss-20b:free", // Primary
+            messages: [{ role: "user", content: fullPrompt }],
+          });
+          return orResponse.choices[0].message.content || "No response.";
+        } catch (e) {
+          console.warn("Primary AI Model Failed, switching to fallback...", e);
+          // Fallback to liquid/lfm-40b if free gpt fails
+          const fallback = await openRouter.chat.completions.create({
+            model: "liquid/lfm-40b", 
+            messages: [{ role: "user", content: fullPrompt }],
+          });
+          return fallback.choices[0].message.content || "No response (Fallback).";
+        }
 
       case 'deepseek':
         const dsResponse = await deepSeek.chat.completions.create({

@@ -10,6 +10,7 @@ import { generateAIResponse, AIModel } from '../../services/aiService';
 import { ConfirmationModal } from '../ui/ConfirmationModal';
 import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore'; 
 import { db } from '../../services/firebase';
+import { toast } from 'react-hot-toast';
 
 interface Message {
   role: 'user' | 'model';

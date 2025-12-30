@@ -442,33 +442,28 @@ export const DBService = {
       });
   },
 
-  replyToUser: async (userId: string, message: string, originalMessageId?: string) => {
-      // 1. Send to User's private message collection
-      const userMsgRef = collection(db, 'users', userId, 'messages');
-      await addDoc(userMsgRef, {
-          role: 'model', // So it appears as AI/Admin response
-          text: message,
-          timestamp: new Date().toISOString(),
-          isSupportReply: true
-      });
-
-      // 2. Create notification (optional, but good for visibility)
-      await addDoc(collection(db, 'notifications'), {
-          title: 'Admin Reply',
-          body: message,
-          link: '/#chatbot',
-          type: 'message',
-          recipientId: userId,
-          relatedMessageId: originalMessageId,
-          createdAt: new Date().toISOString(),
-          read: false
-      });
-
-      // 3. Mark original as replied
-      if (originalMessageId) {
-          try {
-              await updateDoc(doc(db, 'inbox', originalMessageId), { replied: true });
-          } catch(e) { console.error("Failed to mark replied", e); }
+  replyToUser: async (userId: string, text: string, replyToMsgId?: string) => {
+      try {
+          // 1. Add message to the User's private sub-collection (So AIChatbot sees it)
+          await addDoc(collection(db, 'users', userId, 'messages'), {
+              text: text,
+              role: 'model', // Must be 'model' for the chatbot to render it on left
+              timestamp: Date.now(),
+              isSupportReply: true,
+              replyTo: replyToMsgId || null
+          });
+  
+          // 2. Update the original Inbox message to mark as replied (Optional)
+          if (replyToMsgId) {
+              await updateDoc(doc(db, 'inbox', replyToMsgId), {
+                  replied: true,
+                  repliedAt: Date.now()
+              });
+          }
+          return true;
+      } catch (error) {
+          console.error("Error replying to user:", error);
+          throw error;
       }
   }
 };
