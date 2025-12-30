@@ -18,6 +18,7 @@ import { usePresence } from './hooks/usePresence';
 import { ToastSetup } from './components/ui/ToastSetup';
 import { Layout } from './components/layout/Layout';
 import { AIChatbot } from './components/features/AIChatbot';
+import { StudentProfileSetup } from './components/features/StudentProfileSetup';
 import { CookieConsent } from './components/ui/CookieConsent';
 
 // Lazy Pages
@@ -126,6 +127,7 @@ const AppContent: React.FC = () => {
           </Routes>
         </Suspense>
         <AIChatbot />
+        <StudentProfileSetup />
         <CookieConsent />
         
         <AnimatePresence>

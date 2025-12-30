@@ -12,7 +12,7 @@ export const Switch = ({ checked, onChange, disabled }: { checked: boolean; onCh
     <motion.div
       layout
       transition={{ type: 'spring', stiffness: 700, damping: 30 }}
-      className={`bg-white w-5 h-5 rounded-full shadow-md ${checked ? 'translate-x-5' : 'translate-x-0'}`}
+      className={`bg-white w-5 h-5 rounded-full shadow-md ${checked ? 'translate-x-6' : 'translate-x-0'}`}
     />
   </button>
 );

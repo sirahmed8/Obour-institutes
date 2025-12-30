@@ -328,9 +328,20 @@ export const Inbox: React.FC<InboxProps> = ({ subjects = [] }) => {
                                 <div className="flex justify-between items-center">
                                     <p className="text-[10px] text-gray-400">Ctrl + Enter to send</p>
                                     <div className="flex gap-2">
-                                        <a href={`mailto:${selectedMessage.userEmail}`} className="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                                        <button 
+                                            onClick={() => {
+                                                const btn = document.getElementById('send-reply-btn');
+                                                const textarea = btn?.parentElement?.previousElementSibling as HTMLTextAreaElement;
+                                                const replyText = textarea?.value || '';
+
+                                                const subject = encodeURIComponent("Re: Your inquiry to Obour Institutes");
+                                                const body = encodeURIComponent(replyText); 
+                                                window.open(`mailto:${selectedMessage.userEmail}?subject=${subject}&body=${body}`);
+                                            }}
+                                            className="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center"
+                                        >
                                             Email Instead
-                                        </a>
+                                        </button>
                                         <button 
                                             id="send-reply-btn"
                                             onClick={async (e) => {

@@ -243,8 +243,8 @@ export const AIChatbot: React.FC = () => {
     } catch (error: any) {
       console.error("AI Error:", error);
        let errorMsg = `⚠️ **Connection Issue**\n\n`;
-       if (error?.message?.includes('400') || error?.message?.includes('API key') || error?.message?.includes(' quota')) {
-          errorMsg += `I'm currently receiving too many requests or my cloud connection is resting. 😓\n\nSwitched to **Offline Mode** automatically. I can still help with basic questions!`;
+       if (error?.message === '429_QUOTA' || error?.message?.includes('429_QUOTA')) {
+          errorMsg += `I'm currently overloaded. 😓\n\nSwitched to **Offline Mode** automatically. I can still help with basic questions!`;
           setChatbotMode('offline'); 
        } else {
           const offlineResponse = getOfflineResponse(textToSend);
@@ -307,7 +307,7 @@ export const AIChatbot: React.FC = () => {
             style={{ 
               height: isMobile ? '85dvh' : '650px',
               position: 'fixed',
-              bottom: isMobile ? '0' : '1.5rem', 
+              bottom: isMobile ? '6rem' : '1.5rem', // bottom-24 is 6rem
               right: isMobile ? '0' : '1.5rem',
               top: 'auto',
               width: isMobile ? '100%' : '420px',
@@ -436,33 +436,29 @@ export const AIChatbot: React.FC = () => {
                                         exit={{ opacity: 0, y: 10 }}
                                         className="absolute bottom-full left-0 mb-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden p-1.5 z-50"
                                     >
-                                        <button onClick={() => { changeMode('online'); handleModelChange('gemini'); }} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 ${selectedModel === 'gemini' && chatbotMode === 'online' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 dark:text-gray-300 hover:bg-slate-700 hover:text-white'}`}>
+                                        <button onClick={() => { changeMode('online'); handleModelChange('gemini'); }} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors ${selectedModel === 'gemini' && chatbotMode === 'online' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
                                             <Sparkles size={14} className="text-indigo-500"/> Gemini 2.5
                                         </button>
                                         
-                                        <button onClick={() => { changeMode('online'); handleModelChange('openrouter'); }} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 ${selectedModel === 'openrouter' && chatbotMode === 'online' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 dark:text-gray-300 hover:bg-slate-700 hover:text-white'}`}>
+                                        <button onClick={() => { changeMode('online'); handleModelChange('openrouter'); }} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors ${selectedModel === 'openrouter' && chatbotMode === 'online' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
                                             <Globe size={14} className="text-blue-500"/> GPT-OSS (Free)
                                         </button>
 
-                                        <button onClick={() => { changeMode('online'); handleModelChange('deepseek'); }} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 ${selectedModel === 'deepseek' && chatbotMode === 'online' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 dark:text-gray-300 hover:bg-slate-700 hover:text-white'}`}>
+                                        <button onClick={() => { changeMode('online'); handleModelChange('deepseek'); }} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors ${selectedModel === 'deepseek' && chatbotMode === 'online' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
                                             <Brain size={14} className="text-purple-500"/> DeepSeek V3
                                         </button>
 
-                                        <button onClick={() => { changeMode('online'); handleModelChange('kimi'); }} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 ${selectedModel === 'kimi' && chatbotMode === 'online' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 dark:text-gray-300 hover:bg-slate-700 hover:text-white'}`}>
+                                        <button onClick={() => { changeMode('online'); handleModelChange('kimi'); }} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors ${selectedModel === 'kimi' && chatbotMode === 'online' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
                                             <MessageSquare size={14} className="text-pink-500"/> Kimi AI
                                         </button>
                                         
                                         <div className="h-px bg-gray-100 dark:bg-gray-700 my-1"/>
                                         <p className="px-2 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">System</p>
                                         
-                                        <div className="px-2 py-1 text-[10px] text-gray-500 leading-tight">
-                                           Choose your AI brain! Switch between Gemini (Fast), GPT-OSS (Free), or DeepSeek (Smart).
-                                        </div>
-
-                                        <button onClick={() => changeMode('offline')} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 ${chatbotMode === 'offline' ? 'bg-amber-50 text-amber-600' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50'}`}>
+                                        <button onClick={() => changeMode('offline')} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 ${chatbotMode === 'offline' ? 'bg-amber-50 text-amber-600' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
                                             <WifiOff size={14} className="text-amber-500"/> Offline Mode
                                         </button>
-                                        <button onClick={() => changeMode('admin')} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 ${chatbotMode === 'admin' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50'}`}>
+                                        <button onClick={() => changeMode('admin')} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 ${chatbotMode === 'admin' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
                                             <Shield size={14} className="text-gray-500"/> Contact Support
                                         </button>
                                     </motion.div>

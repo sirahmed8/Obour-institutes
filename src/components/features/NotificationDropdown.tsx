@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BellRing, Check, Clock, Trash2, CheckCheck } from 'lucide-react';
+import { Bell, CheckCheck, Trash2, BellRing, X, Check, Clock } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { collection, query, orderBy, limit, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, where } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useClickOutside } from '../../hooks/useClickOutside';
@@ -60,18 +60,23 @@ export const NotificationDropdown: React.FC = () => {
                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="absolute right-0 mt-3 w-80 bg-white dark:bg-gray-900 shadow-2xl rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50 origin-top-right ring-1 ring-black ring-opacity-5"
+                        className="absolute right-0 mt-3 w-80 bg-white dark:bg-gray-900 shadow-2xl rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden z-50 origin-top-right ring-1 ring-black/5"
                     >
                         {/* Header */}
-                        <div className="p-4 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-gray-50/50 dark:bg-slate-900/50">
-                            <h3 className="font-bold text-gray-900 dark:text-white">Notifications</h3>
-                            <button 
-                                onClick={handleMarkAllRead}
-                                className="text-gray-400 hover:text-indigo-500 transition-colors p-1 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
-                                title="Mark all as read"
-                            >
-                                <CheckCheck size={18} />
-                            </button>
+                        <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900">
+                            <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                <BellRing size={16} className="text-indigo-500" /> 
+                                Notifications
+                            </h3>
+                            {unreadCount > 0 && (
+                                <button 
+                                    onClick={handleMarkAllRead}
+                                    title="Mark all as read"
+                                    className="p-1.5 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
+                                >
+                                    <CheckCheck size={16} />
+                                </button>
+                            )}
                         </div>
                         
                         {/* List */}
@@ -114,11 +119,11 @@ export const NotificationDropdown: React.FC = () => {
                         </div>
 
                         {/* Footer */}
-                        <div className="p-2 bg-gray-50/80 dark:bg-slate-900/80 border-t border-gray-100 dark:border-white/10">
+                        <div className="p-2 bg-gray-50/50 dark:bg-slate-900/50 border-t border-gray-100 dark:border-white/10">
                             <Link 
                                 to="/notifications" 
                                 onClick={() => setIsOpen(false)} 
-                                className="block w-full text-center py-3 text-xs font-bold text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors uppercase tracking-wider"
+                                className="flex items-center justify-center w-full py-2.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-xl transition-all uppercase tracking-wide"
                             >
                                 View All History
                             </Link>

@@ -152,7 +152,7 @@ export const Home: React.FC = () => {
             )}
           </h1>
           <p className="text-xl text-gray-500 dark:text-gray-400 font-medium leading-relaxed">
-            {t('welcome_back')}، <span className="text-gray-900 dark:text-white font-bold">{currentUser.displayName?.split(' ')[0]}</span>. {t('explore_subjects')}.
+            {t('welcome_back')}{language === 'ar' ? '،' : ','} <span className="text-gray-900 dark:text-white font-bold">{currentUser.displayName?.split(' ')[0] || 'Student'}</span>. {t('explore_subjects')}.
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">

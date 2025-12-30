@@ -44,7 +44,18 @@ export const GlobalSettings: React.FC = () => {
     setLoading(true);
     try {
       await DBService.updateSettings(settings, true);
-      toast.success("Announcement updated successfully");
+      
+      // Auto-Send Notification for Banner
+      if (settings.showAnnouncement && settings.announcement) {
+          await DBService.sendNotification(
+              "New Announcement", 
+              settings.announcement, 
+              '/', 
+              'announcement'
+          );
+      }
+      
+      toast.success("Announcement updated & Pushed");
     } catch (e) {
       console.error(e);
       toast.error("Failed to save settings");

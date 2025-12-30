@@ -81,6 +81,10 @@ export const Admin: React.FC = () => {
     }
   };
 
+  if (!isAdmin && !loadingData) {
+      return null;
+  }
+
   const handleRemoveAdmin = async (email: string) => {
       if (!canDelete) return toast.error("Permission Denied");
       if (email === currentUser?.email) return toast.error("Cannot remove yourself");
@@ -102,6 +106,12 @@ export const Admin: React.FC = () => {
       transition={{ duration: 0.5, ease: "easeOut" }}
       className="max-w-7xl mx-auto px-4 py-10 pb-24 dark:text-white min-h-screen"
     >
+      {/* Error Boundary Alternative */}
+      {!subjects && !loadingData && (
+          <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-6">
+              Critical Error: Failed to load admin dashboard data. Please refresh.
+          </div>
+      )}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
         <div>
           <h1 className="text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight">Admin Hub</h1>
